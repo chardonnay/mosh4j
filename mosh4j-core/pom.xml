@@ -12,6 +12,21 @@
   <artifactId>mosh4j-core</artifactId>
   <name>mosh4j-core</name>
   <description>Client and server session APIs, UDP datagram layer</description>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.6.3</version>
+        <configuration>
+          <mainClass>org.mosh4j.core.MoshServerMain</mainClass>
+          <arguments>
+            <argument>60001</argument>
+          </arguments>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
   <dependencies>
     <dependency>
       <groupId>org.mosh4j</groupId>

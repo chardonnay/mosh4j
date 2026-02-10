@@ -1,8 +1,7 @@
-# Build and publish binaries when a GitHub Release is published.
-# Builds on both x86_64 (amd64) and ARM64 so JARs are produced for both architectures.
-# Requires: Maven project (pom.xml at repository root).
+# Build and publish JARs for x86_64 (amd64) and ARM64 when a new GitHub Release is published.
+# JARs are attached to the release as *-amd64.jar and *-arm64.jar per module.
 
-name: Release Build
+name: Release Build (amd64 + arm64)
 
 on:
   release:
@@ -34,7 +33,7 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn -B clean package -DskipTests
+        run: mvn -B clean package
 
       - name: Collect and tag JARs by architecture
         run: |

@@ -1,6 +1,6 @@
 # mosh4j
 
-Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol. Use it as a library to build Mosh-compatible clients or servers in Java 25+.
+Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol. [GitHub](https://github.com/chardonnay/mosh4j) Use it as a library to build Mosh-compatible clients or servers in Java 25+.
 
 ## Features
 
@@ -27,6 +27,24 @@ mvn clean package
 ```
 
 Requires JDK 25.
+
+## Tests
+
+```bash
+mvn test
+```
+
+## Test server
+
+To run mosh4j as a test server (e.g. for integration tests or a second mosh4j client):
+
+```bash
+./scripts/run-mosh4j-server.sh [port]
+```
+
+- **Port:** Default is 60001. You can pass the port as the first argument (takes precedence) or set `MOSH_PORT`.
+- **Key:** If `MOSH_KEY` is not set or invalid (must be 22 characters Base64), a random key is generated.
+- The script builds the project, then prints `MOSH CONNECT <port> <key>` to stderr. Stop with Ctrl+C.
 
 ## Usage
 
