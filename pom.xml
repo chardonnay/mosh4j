@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.mosh4j</groupId>
+  <artifactId>mosh4j</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>mosh4j</name>
+  <description>Java implementation of the Mosh UDP/SSP protocol</description>
+  <url>https://github.com/mosh4j/mosh4j</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>25</maven.compiler.source>
+    <maven.compiler.target>25</maven.compiler.target>
+    <maven.compiler.release>25</maven.compiler.release>
+  </properties>
+
+  <modules>
+    <module>mosh4j-protocol</module>
+    <module>mosh4j-crypto</module>
+    <module>mosh4j-transport</module>
+    <module>mosh4j-terminal</module>
+    <module>mosh4j-core</module>
+  </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.mosh4j</groupId>
+        <artifactId>mosh4j-protocol</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mosh4j</groupId>
+        <artifactId>mosh4j-crypto</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mosh4j</groupId>
+        <artifactId>mosh4j-transport</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mosh4j</groupId>
+        <artifactId>mosh4j-terminal</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mosh4j</groupId>
+        <artifactId>mosh4j-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>

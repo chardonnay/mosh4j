@@ -1,0 +1,73 @@
+# Build and publish binaries when a GitHub Release is published.
+# Builds on both x86_64 (amd64) and ARM64 so JARs are produced for both architectures.
+# Requires: Maven project (pom.xml at repository root).
+
+name: Release Build
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B clean package -DskipTests
+
+      - name: Collect and tag JARs by architecture
+        run: |
+          mkdir -p release-jars
+          for f in $(find . -path '*/target/*.jar' \
+            ! -name '*-sources*.jar' \
+            ! -name '*-javadoc*.jar' \
+            ! -name '*-tests*.jar' \
+            ! -name 'original-*.jar'); do
+            basename=$(basename "$f" .jar)
+            cp "$f" "release-jars/${basename}-${{ matrix.arch }}.jar"
+          done
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars-${{ matrix.arch }}
+          path: release-jars/*.jar
+
+  upload-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all JAR artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jars-*
+          path: release-jars
+          merge-multiple: true
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-jars/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
