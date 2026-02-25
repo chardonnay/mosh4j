@@ -21,6 +21,18 @@ class TransportInstructionTest {
     @Test
     void createAckOnly() {
         Transportinstruction.Instruction ack = TransportInstruction.createAckOnly(5, 3);
+        assertEquals(0, ack.getOldNum());
+        assertEquals(0, ack.getNewNum());
+        assertEquals(5, ack.getAckNum());
+        assertEquals(3, ack.getThrowawayNum());
+        assertFalse(ack.hasDiff());
+    }
+
+    @Test
+    void createAckOnly_withSenderState() {
+        Transportinstruction.Instruction ack = TransportInstruction.createAckOnly(7, 7, 5, 3);
+        assertEquals(7, ack.getOldNum());
+        assertEquals(7, ack.getNewNum());
         assertEquals(5, ack.getAckNum());
         assertEquals(3, ack.getThrowawayNum());
         assertFalse(ack.hasDiff());
