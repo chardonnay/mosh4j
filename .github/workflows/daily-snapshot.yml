@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   detect-new-main-commit:
@@ -23,7 +24,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const workflowId = context.workflow;
+            const workflowId = "daily-snapshot.yml";
             const branch = "main";
 
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
