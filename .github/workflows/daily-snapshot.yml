@@ -54,7 +54,15 @@ jobs:
   build-snapshot:
     needs: detect-new-main-commit
     if: needs.detect-new-main-commit.outputs.should_build == 'true'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -75,7 +83,8 @@ jobs:
         run: |
           mkdir -p snapshot-jars
           while IFS= read -r jar; do
-            cp "$jar" "snapshot-jars/$(basename "$jar")"
+            base_name="$(basename "$jar" .jar)"
+            cp "$jar" "snapshot-jars/${base_name}-${{ matrix.arch }}.jar"
           done < <(find . -path "*/target/*.jar" \
             ! -name "*-sources*.jar" \
             ! -name "*-javadoc*.jar" \
@@ -85,7 +94,7 @@ jobs:
       - name: Upload snapshot artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: snapshot-${{ github.sha }}
+          name: snapshot-${{ github.sha }}-${{ matrix.arch }}
           path: snapshot-jars/*.jar
           retention-days: 14
 
