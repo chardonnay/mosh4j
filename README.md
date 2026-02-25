@@ -48,20 +48,45 @@ To run mosh4j as a test server (e.g. for integration tests or a second mosh4j cl
 
 ## Usage
 
-After establishing a session (e.g. via `ssh user@host mosh-server`), you receive a UDP port and an AES key. Use `mosh4j-core` to create a `MoshClientSession` or `MoshServerSession` with that port and key.
+After establishing a session (e.g. via `ssh user@host mosh-server`), you receive a UDP port and an AES key.
+Use `mosh4j-core` to create a `MoshClientSession` or `MoshServerSession` with that port and key.
 
-`MoshClientSession` sets the UDP socket receive timeout to **250 ms** by default (`DEFAULT_UDP_RECEIVE_TIMEOUT_MS`). This converts the blocking `receiveOnce()` call into a poll-friendly loop that returns `null` on timeout instead of blocking indefinitely. To override the timeout, call `UdpDatagramChannel.setReceiveTimeoutMillis(int)` on the underlying channel before starting the receive loop, or change the `DEFAULT_UDP_RECEIVE_TIMEOUT_MS` constant in `MoshClientSession`.
+### Quick start (client session)
 
-**Sending an initial wake-up:**
-Call `session.sendInitialWakeUp()` immediately after constructing/configuring `MoshClientSession` and before entering the receive loop. This sends a harmless single-byte keystroke packet that prompts the server to emit its first framebuffer update. If the server is already sending unsolicited updates (e.g. a shell prompt), the wake-up is unnecessary but harmless.
+`MoshClientSession` sets a default UDP receive timeout of **250 ms** so loops can poll without blocking forever.
+Call `sendInitialWakeUp()` once to trigger the first server frame in setups where the server waits for client input.
 
 ```java
 MoshClientSession session = new MoshClientSession(serverAddr, key, 80, 24);
-session.sendInitialWakeUp();  // trigger first server frame
+session.sendInitialWakeUp();
 while (session.isRunning()) {
     session.receiveOnce();
 }
 ```
+
+### Quick start (terminal frontend)
+
+`MoshTerminalFrontend` wraps receive-loop handling and ANSI rendering into a queue-based API:
+
+```java
+MoshClientSession session = new MoshClientSession(serverAddr, key, 80, 24);
+MoshTerminalFrontend frontend = new MoshTerminalFrontend(session);
+frontend.sendInitialWakeUp(); // optional but recommended
+frontend.start();
+
+while (frontend.isRunning()) {
+    String frame = frontend.takeRenderedOutput(250);
+    if (frame != null) {
+        System.out.print(frame);
+    }
+}
+```
+
+### Integration documentation
+
+For full embedding guidance (architecture, lifecycle, raw host-bytes mode, resize, heartbeat, server embedding, and implementation patterns), see:
+
+- [`docs/java-integration-guide.md`](docs/java-integration-guide.md)
 
 See the [reference implementation](https://github.com/mobile-shell/mosh) for protocol details.
 
@@ -75,4 +100,4 @@ Merge via Pull Request.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GNU General Public License v3.0. See [LICENSE](LICENSE).
