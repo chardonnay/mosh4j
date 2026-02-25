@@ -1,16 +1,15 @@
 package org.mosh4j.terminal;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 /**
  * Minimal framebuffer: fixed size grid, simple ANSI handling (cursor move, clear, basic SGR).
  */
 public class SimpleFramebuffer implements Framebuffer {
 
-    private final int width;
-    private final int height;
-    private final Cell[][] cells;
+    private int width;
+    private int height;
+    private Cell[][] cells;
     private int cursorRow;
     private int cursorCol;
     private boolean cursorVisible = true;
@@ -32,24 +31,24 @@ public class SimpleFramebuffer implements Framebuffer {
     }
 
     @Override
-    public int getWidth() {
+    public synchronized int getWidth() {
         return width;
     }
 
     @Override
-    public int getHeight() {
+    public synchronized int getHeight() {
         return height;
     }
 
     @Override
-    public Cell getCell(int row, int col) {
+    public synchronized Cell getCell(int row, int col) {
         if (row >= 0 && row < height && col >= 0 && col < width) {
             return cells[row][col];
         }
         return Cell.blank();
     }
 
-    void setCell(int row, int col, Cell cell) {
+    synchronized void setCell(int row, int col, Cell cell) {
         if (row >= 0 && row < height && col >= 0 && col < width) {
             cells[row][col] = cell;
         }
@@ -92,14 +91,35 @@ public class SimpleFramebuffer implements Framebuffer {
         return Math.max(lo, Math.min(hi, v));
     }
 
+    public synchronized void resize(int newWidth, int newHeight) {
+        newWidth = Math.max(1, newWidth);
+        newHeight = Math.max(1, newHeight);
+        if (newWidth == width && newHeight == height) return;
+        Cell[][] newCells = new Cell[newHeight][newWidth];
+        for (int r = 0; r < newHeight; r++) {
+            for (int c = 0; c < newWidth; c++) {
+                if (r < height && c < width) {
+                    newCells[r][c] = cells[r][c];
+                } else {
+                    newCells[r][c] = Cell.blank();
+                }
+            }
+        }
+        this.cells = newCells;
+        this.width = newWidth;
+        this.height = newHeight;
+        this.cursorRow = clamp(cursorRow, 0, newHeight - 1);
+        this.cursorCol = clamp(cursorCol, 0, newWidth - 1);
+    }
+
     @Override
-    public void feedHostBytes(byte[] bytes) {
+    public synchronized void feedHostBytes(byte[] bytes) {
         if (bytes == null || bytes.length == 0) return;
         ansiParser.feed(bytes);
     }
 
     @Override
-    public byte[] toStateBytes() {
+    public synchronized byte[] toStateBytes() {
         StringBuilder sb = new StringBuilder();
         sb.append("W").append(width).append("H").append(height).append("R").append(cursorRow).append("C").append(cursorCol).append("\n");
         for (int r = 0; r < height; r++) {
@@ -114,7 +134,7 @@ public class SimpleFramebuffer implements Framebuffer {
     }
 
     @Override
-    public void fromStateBytes(byte[] bytes) {
+    public synchronized void fromStateBytes(byte[] bytes) {
         if (bytes == null || bytes.length == 0) return;
         String s = new String(bytes, StandardCharsets.UTF_8);
         int i = 0;

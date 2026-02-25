@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Mosh server session: accepts a client (roaming), receives user input, sends host output.
+ * Updated to use the fragment layer and proper SSP timing.
  */
 public class MoshServerSession {
 
@@ -26,10 +27,13 @@ public class MoshServerSession {
     private final Framebuffer framebuffer;
     private final TransportSender outputSender;
     private final TransportReceiver inputReceiver;
+    private final FragmentCodec fragmentDecoder;
     private final AtomicReference<InetSocketAddress> clientAddress = new AtomicReference<>();
     private final AtomicLong sendSeq = new AtomicLong(0);
+    private final AtomicLong instructionId = new AtomicLong(0);
     private final RttEstimator rtt = new RttEstimator();
     private volatile boolean running = true;
+    private volatile int lastTimestampReceived = 0;
 
     public MoshServerSession(int port, MoshKey key, int width, int height) throws Exception {
         DatagramSocket socket = new DatagramSocket(port);
@@ -37,6 +41,7 @@ public class MoshServerSession {
         SspCipher cipher = new SspCipher(key);
         this.codec = new SspDatagramCodec(cipher);
         this.framebuffer = new SimpleFramebuffer(width, height);
+        this.fragmentDecoder = new FragmentCodec();
 
         this.inputReceiver = new TransportReceiver(
                 (base, diff) -> diff,
@@ -57,10 +62,13 @@ public class MoshServerSession {
         if (client == null) return;
         long seq = sendSeq.getAndIncrement();
         int ts = (int) (System.currentTimeMillis() & 0xFFFF);
-        Transportinstruction.Instruction inst = outputSender.nextInstruction(outputSender.getAssumedReceiverState());
+        Transportinstruction.Instruction inst = outputSender.nextInstruction(
+                outputSender.getAssumedReceiverState(rtt.getSrttMs()));
         if (inst == null) return;
-        byte[] payload = TransportInstruction.toBytes(inst);
-        byte[] packet = codec.encode(true, seq, ts, 0, payload);
+        byte[] protobufBytes = TransportInstruction.toBytes(inst);
+        long fragId = instructionId.getAndIncrement();
+        byte[] fragmentPayload = FragmentCodec.encodeSingle(fragId, protobufBytes);
+        byte[] packet = codec.encode(true, seq, ts, lastTimestampReceived, fragmentPayload);
         channel.send(client, packet);
     }
 
@@ -74,10 +82,28 @@ public class MoshServerSession {
             DatagramPayload payload = codec.decode(result.packet());
             if (!payload.isServerToClient()) {
                 clientAddress.set(result.source());
-                if (payload.getPayload().length > 0) {
-                    Transportinstruction.Instruction inst = TransportInstruction.parse(payload.getPayload());
-                    inputReceiver.receive(inst);
-                    outputSender.setKnownReceiverState(inst.hasAckNum() ? inst.getAckNum() : 0);
+                int receivedTs = payload.getTimestamp();
+                lastTimestampReceived = receivedTs;
+
+                int echoedTs = payload.getTimestampReply();
+                if (echoedTs != 0) {
+                    int now = (int) (System.currentTimeMillis() & 0xFFFF);
+                    int rttSample = (now - echoedTs) & 0xFFFF;
+                    if (rttSample > 0 && rttSample <= 5000) {
+                        rtt.update(rttSample);
+                    }
+                }
+
+                byte[] fragmentData = payload.getPayload();
+                if (fragmentData != null && fragmentData.length > 0) {
+                    byte[] protobufBytes = fragmentDecoder.decode(fragmentData);
+                    if (protobufBytes != null) {
+                        Transportinstruction.Instruction inst = TransportInstruction.parse(protobufBytes);
+                        inputReceiver.receive(inst);
+                        if (inst.hasAckNum()) {
+                            outputSender.setKnownReceiverState(inst.getAckNum());
+                        }
+                    }
                 }
             }
         } catch (Exception e) {

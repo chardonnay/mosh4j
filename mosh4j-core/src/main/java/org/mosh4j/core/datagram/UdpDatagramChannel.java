@@ -4,7 +4,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -17,6 +17,18 @@ public final class UdpDatagramChannel implements DatagramChannel {
 
     public UdpDatagramChannel(DatagramSocket socket) {
         this.socket = socket;
+    }
+
+    /**
+     * Configure UDP receive timeout in milliseconds.
+     * A timeout converts blocking receive() into a periodic poll loop.
+     */
+    public void setReceiveTimeoutMillis(int timeoutMillis) {
+        try {
+            socket.setSoTimeout(Math.max(0, timeoutMillis));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to configure receive timeout", e);
+        }
     }
 
     @Override
@@ -43,6 +55,8 @@ public final class UdpDatagramChannel implements DatagramChannel {
             byte[] packet = new byte[p.getLength()];
             System.arraycopy(p.getData(), p.getOffset(), packet, 0, p.getLength());
             return new ReceiveResult(source, packet);
+        } catch (SocketTimeoutException timeout) {
+            return null;
         } catch (Exception e) {
             if (open.get()) throw new RuntimeException("Receive failed", e);
             return null;

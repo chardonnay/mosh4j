@@ -4,47 +4,40 @@ import TransportBuffers.Transportinstruction;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.security.SecureRandom;
 import java.util.Objects;
 
 /**
  * Wrapper for SSP transport Instruction (TransportBuffers.Instruction): parse and serialize.
+ * Matches native C++ mosh wire format: protocol_version=2, random chaff bytes.
  */
 public final class TransportInstruction {
 
+    public static final int MOSH_PROTOCOL_VERSION = 2;
     private static final int MAX_FRAGMENT_SIZE = 1400;
+    private static final int MAX_CHAFF_BYTES = 16;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
-    /**
-     * Maximum size of a single instruction payload before fragmentation is needed (bytes).
-     */
     public static int getMaxFragmentSize() {
         return MAX_FRAGMENT_SIZE;
     }
 
-    /**
-     * Parse an Instruction from bytes.
-     */
     public static Transportinstruction.Instruction parse(byte[] bytes) throws IOException {
         return Transportinstruction.Instruction.parseFrom(bytes);
     }
 
-    /**
-     * Parse an Instruction from stream.
-     */
     public static Transportinstruction.Instruction parseFrom(InputStream in) throws IOException {
         return Transportinstruction.Instruction.parseFrom(in);
     }
 
-    /**
-     * Serialize an Instruction to bytes.
-     */
     public static byte[] toBytes(Transportinstruction.Instruction instruction) {
         Objects.requireNonNull(instruction, "instruction");
         return instruction.toByteArray();
     }
 
     /**
-     * Build an instruction (idempotent update from old_num to new_num with diff).
+     * Build an instruction with protocol_version=2 and random chaff bytes,
+     * matching the native C++ mosh wire format.
      */
     public static Transportinstruction.Instruction create(
             long oldNum,
@@ -53,12 +46,18 @@ public final class TransportInstruction {
             long throwawayNum,
             byte[] diff) {
         Transportinstruction.Instruction.Builder b = Transportinstruction.Instruction.newBuilder();
+        b.setProtocolVersion(MOSH_PROTOCOL_VERSION);
         b.setOldNum(oldNum);
         b.setNewNum(newNum);
         b.setAckNum(ackNum);
         b.setThrowawayNum(throwawayNum);
         if (diff != null && diff.length > 0) {
             b.setDiff(com.google.protobuf.ByteString.copyFrom(diff));
+        }
+        byte[] chaff = new byte[RANDOM.nextInt(MAX_CHAFF_BYTES + 1)];
+        if (chaff.length > 0) {
+            RANDOM.nextBytes(chaff);
+            b.setChaff(com.google.protobuf.ByteString.copyFrom(chaff));
         }
         return b.build();
     }
@@ -68,5 +67,13 @@ public final class TransportInstruction {
      */
     public static Transportinstruction.Instruction createAckOnly(long ackNum, long throwawayNum) {
         return create(0, 0, ackNum, throwawayNum, null);
+    }
+
+    /**
+     * Validate that a received instruction uses the expected protocol version.
+     */
+    public static boolean isProtocolVersionValid(Transportinstruction.Instruction inst) {
+        Objects.requireNonNull(inst, "instruction");
+        return inst.hasProtocolVersion() && inst.getProtocolVersion() == MOSH_PROTOCOL_VERSION;
     }
 }

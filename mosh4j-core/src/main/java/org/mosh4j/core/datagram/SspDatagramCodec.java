@@ -8,11 +8,14 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * Encode/decode SSP datagrams: 8-byte nonce (clear) + OCB ciphertext (timestamp, timestamp_reply, payload).
+ * Encode/decode SSP datagrams: 8-byte nonce (clear) + OCB ciphertext
+ * (timestamp, timestamp_reply, fragment-wrapped payload).
+ *
+ * The payload on the wire contains a fragment header (10 bytes) followed by a
+ * zlib-compressed protobuf chunk, matching the native C++ mosh wire format.
  */
 public final class SspDatagramCodec {
 
-    private static final int TIMESTAMP_BYTES = 2;
     private static final int HEADER_PLAINTEXT_BYTES = 4; // timestamp + timestamp_reply
 
     private final SspCipher cipher;
@@ -22,16 +25,21 @@ public final class SspDatagramCodec {
     }
 
     /**
-     * Encode a datagram for sending: nonce (8) + encrypt(timestamp, timestamp_reply, payload).
+     * Encode a datagram for sending.
+     *
+     * <p>{@code fragmentPayload} may be {@code null}, which is treated the same as a
+     * zero-length array and produces a header-only (keepalive) datagram containing only
+     * the timestamp fields. When non-null, the payload must already include the 10-byte
+     * fragment header produced by {@link FragmentCodec}.
      */
-    public byte[] encode(boolean serverToClient, long seq, int timestamp, int timestampReply, byte[] payload) {
+    public byte[] encode(boolean serverToClient, long seq, int timestamp, int timestampReply, byte[] fragmentPayload) {
         byte[] nonce = Nonce.create(serverToClient, seq);
-        int plen = payload != null ? payload.length : 0;
+        int plen = fragmentPayload != null ? fragmentPayload.length : 0;
         byte[] plain = new byte[HEADER_PLAINTEXT_BYTES + plen];
         ByteBuffer buf = ByteBuffer.wrap(plain).order(ByteOrder.BIG_ENDIAN);
         buf.putShort((short) (timestamp & 0xFFFF));
         buf.putShort((short) (timestampReply & 0xFFFF));
-        if (plen > 0) buf.put(payload);
+        if (plen > 0) buf.put(fragmentPayload);
         byte[] ciphertext = cipher.encrypt(serverToClient, seq, plain);
         byte[] out = new byte[Nonce.length() + ciphertext.length];
         System.arraycopy(nonce, 0, out, 0, nonce.length);
@@ -40,7 +48,9 @@ public final class SspDatagramCodec {
     }
 
     /**
-     * Decode a received datagram: parse nonce, decrypt, return payload and metadata.
+     * Decode a received datagram. The returned payload contains the raw fragment
+     * data (fragment header + zlib chunk); use {@link FragmentCodec#decode} to
+     * reassemble and decompress.
      */
     public DatagramPayload decode(byte[] packet) throws AEADBadTagException {
         if (packet == null || packet.length <= Nonce.length()) {
