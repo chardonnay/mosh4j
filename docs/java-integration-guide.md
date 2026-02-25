@@ -29,7 +29,7 @@ If you build inside the same multi-module repository, just depend on `mosh4j-cor
 <dependency>
   <groupId>org.mosh4j</groupId>
   <artifactId>mosh4j-core</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 

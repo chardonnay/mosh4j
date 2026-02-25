@@ -1,4 +1,4 @@
-# mosh4j 1.0.0
+# mosh4j 2.0.0
 
 First stable release of **mosh4j** – a Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol for Java 25+.
 
