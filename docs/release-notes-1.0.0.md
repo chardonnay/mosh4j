@@ -37,4 +37,4 @@ This release provides JARs built for **x86_64 (amd64)** and **ARM64**. JARs are 
 
 ## License
 
-MIT. See [LICENSE](https://github.com/chardonnay/mosh4j/blob/main/LICENSE).
+GNU General Public License v3.0. See [LICENSE](https://github.com/chardonnay/mosh4j/blob/main/LICENSE).
