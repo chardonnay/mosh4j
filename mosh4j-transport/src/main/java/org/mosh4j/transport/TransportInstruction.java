@@ -70,6 +70,19 @@ public final class TransportInstruction {
     }
 
     /**
+     * Build an ack-only instruction without changing sender state numbering.
+     * This avoids state rollback (old/new jumping back to 0) after data packets
+     * were already sent.
+     */
+    public static Transportinstruction.Instruction createAckOnly(
+            long oldNum,
+            long newNum,
+            long ackNum,
+            long throwawayNum) {
+        return create(oldNum, newNum, ackNum, throwawayNum, null);
+    }
+
+    /**
      * Validate that a received instruction uses the expected protocol version.
      */
     public static boolean isProtocolVersionValid(Transportinstruction.Instruction inst) {

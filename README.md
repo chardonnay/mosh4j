@@ -65,6 +65,34 @@ while (session.isRunning()) {
 
 See the [reference implementation](https://github.com/mobile-shell/mosh) for protocol details.
 
+## Terminal Frontend API
+
+`mosh4j` now includes a terminal-frontend layer in addition to protocol/session logic:
+
+- `org.mosh4j.terminal.StatefulAnsiRenderer`  
+  Stateful framebuffer renderer that emits ANSI terminal output (full redraw on first frame, incremental row updates afterwards).
+- `org.mosh4j.core.MoshTerminalFrontend`  
+  Wrapper around `MoshClientSession` with receive loop + output queue for rendered ANSI frames.
+  Also exposes raw host bytes (`pollHostBytes` / `takeHostBytes`) for integrations that already
+  have their own terminal emulator and want to bypass framebuffer rendering.
+
+Example:
+
+```java
+MoshClientSession session = new MoshClientSession(serverAddr, key, 80, 24);
+MoshTerminalFrontend frontend = new MoshTerminalFrontend(session);
+frontend.sendInitialWakeUp();
+frontend.start();
+
+while (frontend.isRunning()) {
+    String frame = frontend.takeRenderedOutput(250);
+    if (frame != null) {
+        // Write frame to your terminal widget/PTY bridge
+        System.out.print(frame);
+    }
+}
+```
+
 ## Branch strategy
 
 - `main` – main development

@@ -18,6 +18,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,6 +38,7 @@ import java.util.logging.Logger;
 public class MoshClientSession {
     private static final Logger LOG = Logger.getLogger(MoshClientSession.class.getName());
     private static final int DEFAULT_UDP_RECEIVE_TIMEOUT_MS = 250;
+    private static final boolean DEBUG = Boolean.parseBoolean(System.getenv("KORTTY_MOSH_DEBUG"));
 
     private final InetSocketAddress serverAddress;
     private final DatagramChannel channel;
@@ -44,11 +47,14 @@ public class MoshClientSession {
     private final TransportReceiver outputReceiver;
     private final FragmentCodec fragmentDecoder;
     private final AtomicLong sendSeq = new AtomicLong(0);
+    private final AtomicLong clientStateSeq = new AtomicLong(1);
     private final AtomicLong instructionId = new AtomicLong(0);
+    private final LinkedBlockingQueue<byte[]> hostBytesQueue = new LinkedBlockingQueue<>(2048);
     private volatile boolean running = true;
     private volatile int lastTimestampReceived = 0;
     private volatile long lastReceivedServerSeq = 0;
     private volatile long lastAckedClientSeq = 0;
+    private volatile long lastSentClientState = 0;
 
     private final ExtensionRegistry hostExtensionRegistry;
 
@@ -91,7 +97,9 @@ public class MoshClientSession {
                 if (instr.hasExtension(Hostinput.hostbytes)) {
                     Hostinput.HostBytes hb = instr.getExtension(Hostinput.hostbytes);
                     if (hb.hasHoststring()) {
-                        buf.feedHostBytes(hb.getHoststring().toByteArray());
+                        byte[] hostBytes = hb.getHoststring().toByteArray();
+                        buf.feedHostBytes(hostBytes);
+                        enqueueHostBytes(hostBytes);
                     }
                 }
                 if (instr.hasExtension(Hostinput.resize)) {
@@ -157,18 +165,35 @@ public class MoshClientSession {
 
     private void sendWrappedUserMessage(byte[] userMsgBytes) {
         long seq = sendSeq.getAndIncrement();
+        long newClientState = clientStateSeq.getAndIncrement();
+        long oldClientState = Math.max(0, Math.max(lastSentClientState, lastAckedClientSeq));
+        if (oldClientState >= newClientState) {
+            oldClientState = Math.max(0, newClientState - 1);
+        }
+        long clientThrowaway = Math.max(0, lastAckedClientSeq);
         int ts = currentTimestamp();
         int tsReply = lastTimestampReceived;
 
         Transportinstruction.Instruction inst = TransportInstruction.create(
-                lastAckedClientSeq, seq, lastReceivedServerSeq, lastReceivedServerSeq, userMsgBytes);
+                oldClientState, newClientState, lastReceivedServerSeq, clientThrowaway, userMsgBytes);
         byte[] protobufBytes = TransportInstruction.toBytes(inst);
 
         long fragId = instructionId.getAndIncrement();
         byte[] fragmentPayload = FragmentCodec.encodeSingle(fragId, protobufBytes);
 
-        byte[] packet = codec.encode(false, seq, ts, tsReply, fragmentPayload);
-        channel.send(serverAddress, packet);
+        try {
+            byte[] packet = codec.encode(false, seq, ts, tsReply, fragmentPayload);
+            channel.send(serverAddress, packet);
+            lastSentClientState = newClientState;
+            if (DEBUG) {
+                LOG.log(Level.INFO, "MoshClientSession tx userinput datagramSeq={0} old={1} new={2} ack={3} throwaway={4} ts={5} tsReply={6} bytes={7}",
+                        new Object[]{seq, oldClientState, newClientState, lastReceivedServerSeq, clientThrowaway, ts, tsReply, userMsgBytes.length});
+            }
+        } catch (RuntimeException e) {
+            // Transient UDP send failures can happen while network is interrupted.
+            // Keep session alive so roaming/recovery can continue.
+            LOG.log(Level.FINE, "Ignoring transient send failure in userinput", e);
+        }
     }
 
     /**
@@ -176,7 +201,14 @@ public class MoshClientSession {
      * and update the framebuffer. Call in a loop or from a thread.
      */
     public boolean receiveOnce() {
-        DatagramChannel.ReceiveResult result = channel.receive();
+        DatagramChannel.ReceiveResult result;
+        try {
+            result = channel.receive();
+        } catch (RuntimeException e) {
+            // Transient receive failures (e.g. network down) should not terminate the loop.
+            LOG.log(Level.FINE, "Ignoring transient receive failure", e);
+            return false;
+        }
         if (result == null || !running) return false;
         try {
             DatagramPayload payload = codec.decode(result.packet());
@@ -187,11 +219,28 @@ public class MoshClientSession {
                     byte[] protobufBytes = fragmentDecoder.decode(fragmentData);
                     if (protobufBytes != null) {
                         Transportinstruction.Instruction inst = TransportInstruction.parse(protobufBytes);
+                        if (!TransportInstruction.isProtocolVersionValid(inst)) {
+                            LOG.log(Level.FINE, "Ignoring instruction with invalid protocol_version");
+                            return true;
+                        }
                         long ack = outputReceiver.receive(inst);
                         lastReceivedServerSeq = ack;
                         if (inst.hasAckNum()) {
                             lastAckedClientSeq = inst.getAckNum();
                         }
+                        if (DEBUG) {
+                            LOG.log(Level.INFO, "MoshClientSession rx server datagramSeq={0} old={1} new={2} ack={3} throwaway={4} diff={5} acceptedServerState={6}",
+                                    new Object[]{
+                                            payload.getSeq(),
+                                            inst.hasOldNum() ? inst.getOldNum() : -1,
+                                            inst.hasNewNum() ? inst.getNewNum() : -1,
+                                            inst.hasAckNum() ? inst.getAckNum() : -1,
+                                            inst.hasThrowawayNum() ? inst.getThrowawayNum() : -1,
+                                            inst.hasDiff() ? inst.getDiff().size() : 0,
+                                            ack
+                                    });
+                        }
+                        sendAckOnly();
                     }
                 }
             }
@@ -205,6 +254,31 @@ public class MoshClientSession {
         return framebuffer;
     }
 
+    /**
+     * Returns next raw host byte chunk if available, otherwise null.
+     */
+    public byte[] pollHostBytes() {
+        return hostBytesQueue.poll();
+    }
+
+    /**
+     * Waits for next raw host byte chunk up to timeout.
+     *
+     * @param timeoutMs timeout in milliseconds
+     * @return host bytes or null if timeout elapsed
+     */
+    public byte[] takeHostBytes(long timeoutMs) throws InterruptedException {
+        return hostBytesQueue.poll(Math.max(1, timeoutMs), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Send a protocol-level heartbeat/ack packet without injecting user input bytes.
+     * This keeps the session active during idle periods and network recovery.
+     */
+    public void sendHeartbeat() {
+        sendAckOnly();
+    }
+
     public void close() {
         running = false;
         channel.close();
@@ -216,5 +290,39 @@ public class MoshClientSession {
 
     private static int currentTimestamp() {
         return (int) (System.currentTimeMillis() & 0xFFFF);
+    }
+
+    private void enqueueHostBytes(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return;
+        }
+        byte[] copy = bytes.clone();
+        if (!hostBytesQueue.offer(copy)) {
+            hostBytesQueue.poll();
+            hostBytesQueue.offer(copy);
+        }
+    }
+
+    private void sendAckOnly() {
+        try {
+            long seq = sendSeq.getAndIncrement();
+            int ts = currentTimestamp();
+            int tsReply = lastTimestampReceived;
+            long state = Math.max(lastSentClientState, lastAckedClientSeq);
+            long clientThrowaway = Math.max(0, lastAckedClientSeq);
+            Transportinstruction.Instruction ackOnly = TransportInstruction.createAckOnly(
+                    state, state, lastReceivedServerSeq, clientThrowaway);
+            byte[] protobuf = TransportInstruction.toBytes(ackOnly);
+            long fragId = instructionId.getAndIncrement();
+            byte[] fragmentPayload = FragmentCodec.encodeSingle(fragId, protobuf);
+            byte[] packet = codec.encode(false, seq, ts, tsReply, fragmentPayload);
+            channel.send(serverAddress, packet);
+            if (DEBUG) {
+                LOG.log(Level.INFO, "MoshClientSession tx ack-only datagramSeq={0} old={1} new={2} ack={3} throwaway={4} ts={5} tsReply={6}",
+                        new Object[]{seq, state, state, lastReceivedServerSeq, clientThrowaway, ts, tsReply});
+            }
+        } catch (Exception e) {
+            LOG.log(Level.FINEST, "Failed to send ack-only packet", e);
+        }
     }
 }
