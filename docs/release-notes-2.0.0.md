@@ -1,13 +1,27 @@
 # mosh4j 2.0.0
 
-First stable release of **mosh4j** – a Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol for Java 25+.
+This release consolidates all changes since `v1.0.0` and publishes the project as **2.0.0**.
+It includes protocol hardening, terminal frontend APIs, CI improvements, security updates, and licensing/versioning updates.
 
 ## Highlights
 
-- **State Synchronization Protocol (SSP)** over UDP with AES-128-OCB encryption
-- **Modular library**: use only protocol + crypto, or the full client/server stack
-- **Compatible** with the official [mosh-server](https://github.com/mobile-shell/mosh) (C++)
-- **Test server** and script to run mosh4j as a server for integration tests
+- **Wire-format reliability improvements**
+  - Improved initial client/server exchange behavior and state/ack sequencing.
+  - Added more robust ack-only behavior and transient network failure handling.
+- **Java terminal frontend**
+  - Added `MoshTerminalFrontend` for queue-based integration.
+  - Added `StatefulAnsiRenderer` for full redraw + incremental ANSI frame output.
+  - Exposed raw host-byte consumption APIs for custom terminal emulators.
+- **Security**
+  - Upgraded `protobuf-java` to a patched version to address `CVE-2024-7254`.
+- **CI/CD snapshots**
+  - Added daily snapshot builds from `main`.
+  - Fixed workflow detection/API access issues.
+  - Added `amd64` + `arm64` matrix snapshot artifacts.
+- **Documentation and project metadata**
+  - Expanded Java integration documentation with practical embedding patterns and examples.
+  - Switched license references and repository license file to GPL-3.0.
+  - Bumped project/module versions to `2.0.0`.
 
 ## Modules
 
@@ -31,9 +45,12 @@ First stable release of **mosh4j** – a Java implementation of the [Mosh](https
 
 Use `MoshClientSession` or `MoshServerSession` from `mosh4j-core` with a UDP port and session key (e.g. from `ssh user@host mosh-server` or from the test server output).
 
+See also: [`docs/java-integration-guide.md`](./java-integration-guide.md)
+
 ## Artifacts
 
-This release provides JARs built for **x86_64 (amd64)** and **ARM64**. JARs are portable; use the build that matches your deployment architecture or either one on any platform with Java 25.
+- Release workflow publishes JARs for **x86_64 (amd64)** and **ARM64**.
+- Daily snapshot workflow now also builds architecture-specific artifacts for both platforms.
 
 ## License
 
