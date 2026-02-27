@@ -11,6 +11,7 @@ import java.util.Base64;
  * Prints "MOSH CONNECT &lt;port&gt; &lt;key&gt;" so a client can connect.
  * <p>
  * Usage: port and key can be set via env MOSH_PORT, MOSH_KEY, or default port 60001 and a random key.
+ * The session key is redacted unless MOSH_PRINT_KEY=1 (or true) is set, to avoid leaking secrets in logs.
  */
 public final class MoshServerMain {
 
@@ -22,10 +23,23 @@ public final class MoshServerMain {
         int port = DEFAULT_PORT;
         String portEnv = System.getenv("MOSH_PORT");
         if (portEnv != null && !portEnv.isEmpty()) {
-            port = Integer.parseInt(portEnv.trim());
+            try {
+                port = Integer.parseInt(portEnv.trim());
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid MOSH_PORT, using default " + DEFAULT_PORT + ": " + portEnv);
+                port = DEFAULT_PORT;
+            }
         }
         if (args.length > 0 && args[0] != null && !args[0].isEmpty()) {
-            port = Integer.parseInt(args[0].trim());
+            try {
+                port = Integer.parseInt(args[0].trim());
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid port argument, using " + port + ": " + args[0]);
+            }
+        }
+        if (port <= 0 || port > 65535) {
+            System.err.println("Port out of range 1-65535, using " + DEFAULT_PORT);
+            port = DEFAULT_PORT;
         }
 
         String keyBase64 = System.getenv("MOSH_KEY");
@@ -38,7 +52,12 @@ public final class MoshServerMain {
         MoshKey key = MoshKey.fromBase64(keyBase64);
         MoshServerSession session = new MoshServerSession(port, key, WIDTH, HEIGHT);
 
-        System.err.println("MOSH CONNECT " + port + " " + keyBase64);
+        boolean printKey = "1".equals(System.getenv("MOSH_PRINT_KEY")) || "true".equalsIgnoreCase(System.getenv("MOSH_PRINT_KEY"));
+        if (printKey) {
+            System.err.println("MOSH CONNECT " + port + " " + keyBase64);
+        } else {
+            System.err.println("MOSH CONNECT " + port + " <key redacted; set MOSH_PRINT_KEY=1 to show>");
+        }
         System.err.flush();
 
         boolean firstContact = true;

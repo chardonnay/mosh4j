@@ -13,6 +13,8 @@ public final class MinimalAnsiParser {
     private final StringBuilder plain = new StringBuilder();
     private final List<Integer> csiParams = new ArrayList<>();
     private int state = 0;
+    private static final int MAX_CSI_PARAMS = 32;
+    private static final int MAX_CSI_PARAM_VALUE = 65536;
     private static final int PLAIN = 0;
     private static final int ESC = 1;
     private static final int CSI = 2;
@@ -59,12 +61,26 @@ public final class MinimalAnsiParser {
             case CSI, CSI_PARAM -> {
                 if (c >= '0' && c <= '9') {
                     if (state == CSI) {
+                        if (csiParams.size() >= MAX_CSI_PARAMS) {
+                            state = PLAIN;
+                            break;
+                        }
                         csiParams.add(0);
                         state = CSI_PARAM;
                     }
                     int last = csiParams.size() - 1;
-                    csiParams.set(last, csiParams.get(last) * 10 + (c - '0'));
+                    int prev = csiParams.get(last);
+                    int next = prev * 10 + (c - '0');
+                    if (next > MAX_CSI_PARAM_VALUE) {
+                        state = PLAIN;
+                        break;
+                    }
+                    csiParams.set(last, next);
                 } else if (c == ';') {
+                    if (csiParams.size() >= MAX_CSI_PARAMS) {
+                        state = PLAIN;
+                        break;
+                    }
                     csiParams.add(0);
                 } else if (c == 'm') {
                     handleSgr();
