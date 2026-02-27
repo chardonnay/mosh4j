@@ -149,13 +149,20 @@ public class SimpleFramebuffer implements Framebuffer {
                         return;
                     }
                     int cEnd = s.indexOf('\n', hEnd);
-                    if (cEnd > 0) {
-                        int cIdx = s.indexOf('C', hEnd);
-                        if (cIdx > hEnd) {
-                            cursorRow = Math.max(0, Math.min(height - 1, Integer.parseInt(s.substring(hEnd + 1, cIdx))));
-                            cursorCol = Math.max(0, Math.min(width - 1, Integer.parseInt(s.substring(cIdx + 1, cEnd))));
-                            i = cEnd + 1;
+                    int cIdx = s.indexOf('C', hEnd);
+                    if (cEnd <= 0 || cIdx <= hEnd) {
+                        i = (cEnd > 0 ? cEnd + 1 : hEnd + 1);
+                    } else {
+                        try {
+                            cursorRow = Integer.parseInt(s.substring(hEnd + 1, cIdx));
+                            cursorCol = Integer.parseInt(s.substring(cIdx + 1, cEnd));
+                            cursorRow = Math.max(0, Math.min(cursorRow, height - 1));
+                            cursorCol = Math.max(0, Math.min(cursorCol, width - 1));
+                        } catch (NumberFormatException e) {
+                            cursorRow = 0;
+                            cursorCol = 0;
                         }
+                        i = cEnd + 1;
                     }
                 } catch (NumberFormatException | IndexOutOfBoundsException ignored) {
                     return;
