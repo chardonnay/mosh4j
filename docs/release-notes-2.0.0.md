@@ -35,7 +35,7 @@ It includes protocol hardening, terminal frontend APIs, CI improvements, securit
 
 ## Requirements
 
-- **JDK 25** (LTS)
+- **JDK 21** (LTS)
 
 ## Usage
 
