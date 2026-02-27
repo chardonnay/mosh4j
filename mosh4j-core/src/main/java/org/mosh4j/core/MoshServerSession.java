@@ -15,12 +15,16 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Mosh server session: accepts a client (roaming), receives user input, sends host output.
  * Updated to use the fragment layer and proper SSP timing.
  */
 public class MoshServerSession {
+
+    private static final Logger LOG = Logger.getLogger(MoshServerSession.class.getName());
 
     private final DatagramChannel channel;
     private final SspDatagramCodec codec;
@@ -107,7 +111,7 @@ public class MoshServerSession {
                 }
             }
         } catch (Exception e) {
-            // ignore
+            LOG.log(Level.FINE, "Decode or process failed for datagram", e);
         }
         return true;
     }

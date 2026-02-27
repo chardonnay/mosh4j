@@ -245,7 +245,7 @@ public class MoshClientSession {
                 }
             }
         } catch (Exception e) {
-            // ignore auth failures / bad packets
+            LOG.log(Level.FINE, "Decode or process failed for datagram (auth failure or bad packet)", e);
         }
         return true;
     }
@@ -322,7 +322,7 @@ public class MoshClientSession {
                         new Object[]{seq, state, state, lastReceivedServerSeq, clientThrowaway, ts, tsReply});
             }
         } catch (Exception e) {
-            LOG.log(Level.FINEST, "Failed to send ack-only packet", e);
+            LOG.log(Level.FINE, "Failed to send ack-only packet", e);
         }
     }
 }

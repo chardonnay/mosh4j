@@ -14,7 +14,7 @@ This guide explains how to embed `mosh4j` into your Java application as a Mosh-c
 
 ## 2) Prerequisites
 
-- Java 25+
+- Java 21+
 - A running `mosh-server` endpoint (or your own server implementation)
 - A valid Mosh session tuple:
   - UDP host
