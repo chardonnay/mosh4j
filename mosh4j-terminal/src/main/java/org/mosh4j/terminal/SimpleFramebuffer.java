@@ -151,7 +151,7 @@ public class SimpleFramebuffer implements Framebuffer {
                     int cEnd = s.indexOf('\n', hEnd);
                     int cIdx = s.indexOf('C', hEnd);
                     if (cEnd <= 0 || cIdx <= hEnd) {
-                        i = (cEnd > 0 ? cEnd + 1 : hEnd + 1);
+                        return;
                     } else {
                         try {
                             cursorRow = Integer.parseInt(s.substring(hEnd + 1, cIdx));
