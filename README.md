@@ -2,6 +2,8 @@
 
 Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol. [GitHub](https://github.com/chardonnay/mosh4j) Use it as a library to build Mosh-compatible clients or servers in Java 21+.
 
+**Releases:** [v2.0.1](https://github.com/chardonnay/mosh4j/releases/tag/v2.0.1) — [release notes](docs/release-notes-2.0.1.md)
+
 ## Features
 
 - **State Synchronization Protocol (SSP)** over UDP

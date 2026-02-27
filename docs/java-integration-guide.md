@@ -29,11 +29,11 @@ If you build inside the same multi-module repository, just depend on `mosh4j-cor
 <dependency>
   <groupId>org.mosh4j</groupId>
   <artifactId>mosh4j-core</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
 </dependency>
 ```
 
-If you use a different version in your build, align all `org.mosh4j` artifacts to the same version.
+If you use a different version in your build, align all `org.mosh4j` artifacts to the same version. See [release notes](release-notes-2.0.1.md) for the latest changes.
 
 ## 4) Session bootstrap
 
