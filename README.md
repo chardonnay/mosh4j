@@ -1,6 +1,6 @@
 # mosh4j
 
-Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol. [GitHub](https://github.com/chardonnay/mosh4j) Use it as a library to build Mosh-compatible clients or servers in Java 25+.
+Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP protocol. [GitHub](https://github.com/chardonnay/mosh4j) Use it as a library to build Mosh-compatible clients or servers in Java 21+.
 
 ## Features
 
@@ -8,7 +8,7 @@ Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP proto
 - **AES-128-OCB** authenticated encryption (session key from mosh-server)
 - Compatible with the official [mosh-server](https://github.com/mobile-shell/mosh) (C++)
 - Modular layout: use only protocol + crypto, or full client/server stack
-- Java 25 (LTS)
+- Java 21 (LTS)
 
 ## Modules
 
@@ -26,7 +26,7 @@ Java implementation of the [Mosh](https://mosh.org) (mobile shell) UDP/SSP proto
 mvn clean package
 ```
 
-Requires JDK 25.
+Requires JDK 21.
 
 ## Tests
 
