@@ -1,53 +1,54 @@
-# mosh4j Java Integration Guide
+= mosh4j Java Integration Guide
 
-Comprehensive guide for embedding mosh4j into Java applications — with real-world examples inspired by [korTTY](https://github.com/chardonnay/korTTY), a terminal application built on mosh4j.
+Comprehensive guide for embedding mosh4j into Java applications — with real-world examples inspired by link:https://github.com/chardonnay/korTTY[korTTY], a terminal application built on mosh4j.
 
----
 
-## Table of Contents
 
-1. [Overview](#1-overview)
-2. [Architecture](#2-architecture)
-3. [Prerequisites](#3-prerequisites)
-4. [Dependency Setup](#4-dependency-setup)
-5. [Session Bootstrap via SSH](#5-session-bootstrap-via-ssh)
-6. [Integration Patterns](#6-integration-patterns)
-7. [Complete Example: korTTY-Style Terminal Application](#7-complete-example-kortty-style-terminal-application)
-8. [User Input, Resize, and Heartbeat](#8-user-input-resize-and-heartbeat)
-9. [Session Lifecycle Management](#9-session-lifecycle-management)
-10. [Error Handling and Reconnection](#10-error-handling-and-reconnection)
-11. [Threading Model](#11-threading-model)
-12. [Embedding a Mosh Server](#12-embedding-a-mosh-server)
-13. [JavaFX Integration Example](#13-javafx-integration-example)
-14. [Swing Integration Example](#14-swing-integration-example)
-15. [Headless / CLI Integration Example](#15-headless--cli-integration-example)
-16. [Multi-Session Management](#16-multi-session-management)
-17. [Debug and Diagnostics](#17-debug-and-diagnostics)
-18. [API Reference Summary](#18-api-reference-summary)
-19. [Practical Checklist](#19-practical-checklist)
+== Table of Contents
 
----
+1. link:#1-overview[Overview]
+2. link:#2-architecture[Architecture]
+3. link:#3-prerequisites[Prerequisites]
+4. link:#4-dependency-setup[Dependency Setup]
+5. link:#5-session-bootstrap-via-ssh[Session Bootstrap via SSH]
+6. link:#6-integration-patterns[Integration Patterns]
+7. link:#7-complete-example-kortty-style-terminal-application[Complete Example: korTTY-Style Terminal Application]
+8. link:#8-user-input-resize-and-heartbeat[User Input, Resize, and Heartbeat]
+9. link:#9-session-lifecycle-management[Session Lifecycle Management]
+10. link:#10-error-handling-and-reconnection[Error Handling and Reconnection]
+11. link:#11-threading-model[Threading Model]
+12. link:#12-embedding-a-mosh-server[Embedding a Mosh Server]
+13. link:#13-javafx-integration-example[JavaFX Integration Example]
+14. link:#14-swing-integration-example[Swing Integration Example]
+15. link:#15-headless--cli-integration-example[Headless / CLI Integration Example]
+16. link:#16-multi-session-management[Multi-Session Management]
+17. link:#17-debug-and-diagnostics[Debug and Diagnostics]
+18. link:#18-api-reference-summary[API Reference Summary]
+19. link:#19-practical-checklist[Practical Checklist]
 
-## 1) Overview
+
+
+== 1) Overview
 
 mosh4j provides a pure Java implementation of the Mosh UDP/SSP protocol stack. It lets your application communicate with any standard `mosh-server` (C++) without native dependencies.
 
-![mosh4j Architecture](images/mosh4j-architecture.png)
+image::images/mosh4j-architecture.png[mosh4j Architecture]
 
-**Typical flow:**
+*Typical flow:*
 1. Your app starts a `mosh-server` on the remote host (usually via SSH)
 2. The server returns a UDP port and a Base64-encoded AES-128 key
 3. Your app creates a `MoshClientSession` with that port and key
 4. mosh4j handles encryption, fragmentation, state sync, and terminal rendering
 5. Your app consumes ANSI frames (or raw bytes) and forwards user input
 
----
 
-## 2) Architecture
+
+== 2) Architecture
 
 The library is split into five modules:
 
-```
+[source]
+----
 +-----------------------------------------------------+
 |               Your Application (korTTY)              |
 +-----------------------------------------------------+
@@ -65,68 +66,71 @@ The library is split into five modules:
 |     Protobuf: TransportBuffers, ClientBuffers,       |
 |               HostBuffers                            |
 +-----------------------------------------------------+
-```
+----
+*What each module does:*
 
-**What each module does:**
+[cols="1,1"]
+|===
+|Module|Responsibility
+|`mosh4j-protocol`|Protobuf `.proto` definitions and generated Java classes for the Mosh wire format
+|`mosh4j-crypto`|AES-128-OCB authenticated encryption/decryption, 12-byte nonce construction, Base64 key decoding
+|`mosh4j-transport`|State Synchronization Protocol logic — send/receive instructions, ack tracking, zlib fragment encoding
+|`mosh4j-terminal`|Terminal emulation: `SimpleFramebuffer` tracks cell grid + cursor; `MinimalAnsiParser` interprets host bytes; `StatefulAnsiRenderer` produces incremental ANSI output
+|`mosh4j-core`|Top-level session APIs (`MoshClientSession`, `MoshServerSession`, `MoshTerminalFrontend`) plus UDP datagram codec
+|===
 
-| Module | Responsibility |
-|--------|---------------|
-| `mosh4j-protocol` | Protobuf `.proto` definitions and generated Java classes for the Mosh wire format |
-| `mosh4j-crypto` | AES-128-OCB authenticated encryption/decryption, 12-byte nonce construction, Base64 key decoding |
-| `mosh4j-transport` | State Synchronization Protocol logic — send/receive instructions, ack tracking, zlib fragment encoding |
-| `mosh4j-terminal` | Terminal emulation: `SimpleFramebuffer` tracks cell grid + cursor; `MinimalAnsiParser` interprets host bytes; `StatefulAnsiRenderer` produces incremental ANSI output |
-| `mosh4j-core` | Top-level session APIs (`MoshClientSession`, `MoshServerSession`, `MoshTerminalFrontend`) plus UDP datagram codec |
 
----
 
-## 3) Prerequisites
 
-- **Java 21+** (LTS)
-- A running `mosh-server` endpoint — either the official C++ [mosh-server](https://mosh.org) or mosh4j's own `MoshServerSession`
+== 3) Prerequisites
+
+- *Java 21+* (LTS)
+- A running `mosh-server` endpoint — either the official C++ link:https://mosh.org[mosh-server] or mosh4j's own `MoshServerSession`
 - A valid Mosh session tuple:
   - UDP host (IP address or hostname)
   - UDP port (e.g. `60001`)
   - `MOSH_KEY` — 22-character Base64-encoded 128-bit AES key
 
----
 
-## 4) Dependency Setup
+
+== 4) Dependency Setup
 
 Add `mosh4j-core` to your Maven `pom.xml`:
 
-```xml
+[source,xml]
+----
 <dependency>
   <groupId>org.mosh4j</groupId>
   <artifactId>mosh4j-core</artifactId>
   <version>2.0.1</version>
 </dependency>
-```
-
+----
 For Gradle:
 
-```groovy
+[source,groovy]
+----
 implementation 'org.mosh4j:mosh4j-core:2.0.1'
-```
-
+----
 `mosh4j-core` transitively includes `mosh4j-protocol`, `mosh4j-crypto`, `mosh4j-transport`, and `mosh4j-terminal`. You do not need to declare them separately.
 
 If you only need the crypto layer (e.g. for a custom protocol implementation):
 
-```xml
+[source,xml]
+----
 <dependency>
   <groupId>org.mosh4j</groupId>
   <artifactId>mosh4j-crypto</artifactId>
   <version>2.0.1</version>
 </dependency>
-```
+----
 
----
 
-## 5) Session Bootstrap via SSH
+== 5) Session Bootstrap via SSH
 
 Before creating a `MoshClientSession`, you need a UDP port and key from a running `mosh-server`. The standard bootstrap is to start `mosh-server` via SSH:
 
-```java
+[source,java]
+----
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
@@ -170,32 +174,32 @@ public class MoshBootstrap {
         return new MoshSession(sshHost, port, key);
     }
 }
-```
-
+----
 Usage:
 
-```java
+[source,java]
+----
 MoshBootstrap.MoshSession ms =
     MoshBootstrap.startMoshServer("user", "server.example.com");
 
 InetSocketAddress addr = new InetSocketAddress(ms.host(), ms.port());
 MoshKey key = MoshKey.fromBase64(ms.key());
 MoshClientSession session = new MoshClientSession(addr, key, 80, 24);
-```
+----
 
----
 
-## 6) Integration Patterns
+== 6) Integration Patterns
 
 mosh4j supports three integration patterns. Choose based on your application's terminal rendering approach:
 
-![mosh4j Integration Patterns](images/mosh4j-integration-patterns.png)
+image::images/mosh4j-integration-patterns.png[mosh4j Integration Patterns]
 
-### Pattern A: ANSI Frame Consumer
+=== Pattern A: ANSI Frame Consumer
 
-**Best for:** terminal widgets that accept ANSI escape sequences (e.g. JediTerm, Lanterna, raw `System.out`).
+*Best for:* terminal widgets that accept ANSI escape sequences (e.g. JediTerm, Lanterna, raw `System.out`).
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshClientSession;
 import org.mosh4j.core.MoshTerminalFrontend;
 import org.mosh4j.crypto.MoshKey;
@@ -221,18 +225,18 @@ public class PatternA_AnsiFrames {
         }
     }
 }
-```
-
-**Key points:**
+----
+*Key points:*
 - `takeRenderedOutput(250)` blocks up to 250 ms — recommended poll interval
 - The renderer tracks dirty rows and only emits CSI sequences for changed lines
 - Queue capacity defaults to 256; old frames are dropped when full
 
-### Pattern B: Raw Host Bytes
+=== Pattern B: Raw Host Bytes
 
-**Best for:** apps with their own terminal emulator (xterm.js, hterm, custom VT100).
+*Best for:* apps with their own terminal emulator (xterm.js, hterm, custom VT100).
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshClientSession;
 import org.mosh4j.core.MoshTerminalFrontend;
 import org.mosh4j.crypto.MoshKey;
@@ -259,18 +263,18 @@ public class PatternB_RawHostBytes {
         }
     }
 }
-```
-
-**Key points:**
+----
+*Key points:*
 - Raw bytes contain VT100/ANSI escape sequences + UTF-8 text from the remote shell
 - Bypasses mosh4j's built-in renderer — ideal when your UI has its own emulator
 - korTTY uses this pattern to feed its custom terminal widget
 
-### Pattern C: Low-Level Session Loop
+=== Pattern C: Low-Level Session Loop
 
-**Best for:** maximum control over threading, polling, and state inspection.
+*Best for:* maximum control over threading, polling, and state inspection.
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshClientSession;
 import org.mosh4j.crypto.MoshKey;
 import org.mosh4j.terminal.Framebuffer;
@@ -324,18 +328,18 @@ public class PatternC_LowLevel {
         System.out.flush();
     }
 }
-```
-
-**Key points:**
+----
+*Key points:*
 - `receiveOnce()` is non-blocking (returns after UDP receive timeout, default 250 ms)
 - Direct framebuffer access gives cell-level data: code points, colors, renditions
 
----
-## 7) Complete Example: korTTY-Style Terminal Application
+
+== 7) Complete Example: korTTY-Style Terminal Application
 
 This example shows how a terminal application like korTTY structures its mosh4j integration. It demonstrates SSH bootstrap, session management, input handling, resize, and clean shutdown.
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshClientSession;
 import org.mosh4j.core.MoshTerminalFrontend;
 import org.mosh4j.crypto.MoshKey;
@@ -526,27 +530,27 @@ public class KorTTYExample {
         app.run();
     }
 }
-```
+----
 
----
 
-## 8) User Input, Resize, and Heartbeat
+== 8) User Input, Resize, and Heartbeat
 
-### Sending keystrokes
+=== Sending keystrokes
 
 Forward raw byte arrays from your input layer. mosh4j wraps them in `ClientBuffers.UserMessage`, fragments with zlib, encrypts with AES-128-OCB, and sends over UDP:
 
-```java
+[source,java]
+----
 frontend.sendUserInput(new byte[]{ 'a' });                         // single char
 frontend.sendUserInput("\r".getBytes(StandardCharsets.UTF_8));      // Enter
 frontend.sendUserInput(new byte[]{ 0x03 });                        // Ctrl+C
 frontend.sendUserInput(new byte[]{ 0x1b, '[', 'A' });              // Arrow Up
 frontend.sendUserInput("ls -la /tmp\n".getBytes(StandardCharsets.UTF_8)); // command
-```
+----
+=== Sending terminal resize
 
-### Sending terminal resize
-
-```java
+[source,java]
+----
 componentPanel.addComponentListener(new ComponentAdapter() {
     @Override
     public void componentResized(ComponentEvent e) {
@@ -555,85 +559,85 @@ componentPanel.addComponentListener(new ComponentAdapter() {
         frontend.sendResize(cols, rows);
     }
 });
-```
+----
+=== Keepalive / heartbeat
 
-### Keepalive / heartbeat
-
-```java
+[source,java]
+----
 ScheduledExecutorService scheduler =
     Executors.newSingleThreadScheduledExecutor();
 scheduler.scheduleAtFixedRate(
     () -> frontend.sendHeartbeat(),
     30, 30, TimeUnit.SECONDS
 );
-```
-
+----
 The heartbeat sends an ack-only SSP packet without user input bytes.
 
----
 
-## 9) Session Lifecycle Management
 
-![mosh4j Connection Lifecycle](images/mosh4j-connection-lifecycle.png)
+== 9) Session Lifecycle Management
 
-### Phase 1: Bootstrap
+image::images/mosh4j-connection-lifecycle.png[mosh4j Connection Lifecycle]
 
-```java
+=== Phase 1: Bootstrap
+
+[source,java]
+----
 MoshCredentials creds = bootstrapMoshServer();
-```
+----
+=== Phase 2: Session creation
 
-### Phase 2: Session creation
-
-```java
+[source,java]
+----
 InetSocketAddress addr = new InetSocketAddress(host, creds.port());
 MoshKey key = MoshKey.fromBase64(creds.key());
 MoshClientSession session = new MoshClientSession(addr, key, cols, rows);
-```
+----
+=== Phase 3: Frontend setup
 
-### Phase 3: Frontend setup
-
-```java
+[source,java]
+----
 MoshTerminalFrontend frontend = new MoshTerminalFrontend(session);
 frontend.sendInitialWakeUp();  // trigger first server frame
 frontend.start();              // start background receive thread
-```
+----
+=== Phase 4: Active session
 
-### Phase 4: Active session
-
-```java
+[source,java]
+----
 while (frontend.isRunning()) {
     String frame = frontend.takeRenderedOutput(250);
     if (frame != null) render(frame);
 }
-```
+----
+=== Phase 5: Shutdown
 
-### Phase 5: Shutdown
-
-```java
+[source,java]
+----
 frontend.close();
-```
-
+----
 `MoshTerminalFrontend` implements `Closeable` — use try-with-resources:
 
-```java
+[source,java]
+----
 try (MoshTerminalFrontend frontend = new MoshTerminalFrontend(session)) {
     frontend.sendInitialWakeUp();
     frontend.start();
     // ... use session ...
 }
-```
+----
 
----
 
-## 10) Error Handling and Reconnection
+== 10) Error Handling and Reconnection
 
-### Transient network errors
+=== Transient network errors
 
 mosh4j handles transient UDP errors internally — dropped packets, temporary outages, and IP changes (roaming) are handled by the SSP protocol.
 
-### Reconnection pattern (korTTY-style)
+=== Reconnection pattern (korTTY-style)
 
-```java
+[source,java]
+----
 public class ResilientMoshClient {
     private static final int MAX_RETRIES = 5;
     private static final long RETRY_DELAY_MS = 3000;
@@ -679,13 +683,13 @@ public class ResilientMoshClient {
         System.err.println("All connection attempts exhausted.");
     }
 }
-```
+----
 
----
 
-## 11) Threading Model
+== 11) Threading Model
 
-```
+[source]
+----
 +-----------------------------------------------+
 |              Your Application                  |
 |  +--------------+    +--------------------+    |
@@ -696,24 +700,29 @@ public class ResilientMoshClient {
 |         |                     |                |
 |         v                     v                |
 |  +---------------------------------------------+
-|  |         MoshTerminalFrontend                |
-|  |  +---------------------------------------+  |
-|  |  |  Background Receive Thread (daemon)   |  |
-|  |  |  loop: receiveOnce -> render -> queue |  |
-|  |  +---------------------------------------+  |
-|  +---------------------------------------------+
-+-----------------------------------------------+
-```
+[cols="1,1"]
+|===
+||MoshTerminalFrontend
+|||Background Receive Thread (daemon)|
+|===
 
-**Thread-safety rules:**
+[cols="1"]
+|===
+|+---------------------------------------------+
+|===
+
++-----------------------------------------------+
+----
+*Thread-safety rules:*
 - `sendUserInput()`, `sendResize()`, `sendHeartbeat()` — safe from any thread
 - `takeRenderedOutput()` / `takeHostBytes()` — safe from any single consumer thread
 - Background receive thread is a daemon — will not prevent JVM shutdown
 - `close()` — safe from any thread; interrupts receive thread
 
-**Single-threaded alternative** (no background thread):
+*Single-threaded alternative* (no background thread):
 
-```java
+[source,java]
+----
 MoshTerminalFrontend frontend = new MoshTerminalFrontend(session);
 frontend.sendInitialWakeUp();
 
@@ -723,13 +732,13 @@ while (frontend.isRunning()) {
     if (frame != null) render(frame);
     Thread.sleep(10);
 }
-```
+----
 
----
 
-## 12) Embedding a Mosh Server
+== 12) Embedding a Mosh Server
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshServerSession;
 import org.mosh4j.crypto.MoshKey;
 import java.security.SecureRandom;
@@ -761,25 +770,28 @@ public class EmbeddedMoshServer {
         }
     }
 }
-```
+----
+*Server API:*
 
-**Server API:**
+[cols="1,1"]
+|===
+|Method|Description
+|`MoshServerSession(port, key, w, h)`|Bind UDP socket
+|`feedHostOutput(byte[])`|Push terminal bytes to client
+|`receiveOnce()`|Process one client datagram
+|`getFramebuffer()`|Access server framebuffer
+|`close()`|Stop server
+|`isRunning()`|Check if active
+|===
 
-| Method | Description |
-|--------|-------------|
-| `MoshServerSession(port, key, w, h)` | Bind UDP socket |
-| `feedHostOutput(byte[])` | Push terminal bytes to client |
-| `receiveOnce()` | Process one client datagram |
-| `getFramebuffer()` | Access server framebuffer |
-| `close()` | Stop server |
-| `isRunning()` | Check if active |
 
----
-## 13) JavaFX Integration Example
+
+== 13) JavaFX Integration Example
 
 Complete example embedding mosh4j into a JavaFX application:
 
-```java
+[source,java]
+----
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -889,15 +901,15 @@ public class MoshFxTerminal extends Application {
 
     public static void main(String[] args) { launch(args); }
 }
-```
+----
 
----
 
-## 14) Swing Integration Example
+== 14) Swing Integration Example
 
 For Swing-based applications:
 
-```java
+[source,java]
+----
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -1033,15 +1045,15 @@ public class MoshSwingTerminal extends JFrame {
             args[0], Integer.parseInt(args[1]), args[2]);
     }
 }
-```
+----
 
----
 
-## 15) Headless / CLI Integration Example
+== 15) Headless / CLI Integration Example
 
 Minimal headless client for automation, scripting, or testing:
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshClientSession;
 import org.mosh4j.core.MoshTerminalFrontend;
 import org.mosh4j.crypto.MoshKey;
@@ -1095,15 +1107,15 @@ public class HeadlessMoshClient {
         System.out.println("Remote output:\n" + result);
     }
 }
-```
+----
 
----
 
-## 16) Multi-Session Management
+== 16) Multi-Session Management
 
 Applications like korTTY often manage multiple simultaneous sessions (tabbed terminals):
 
-```java
+[source,java]
+----
 import org.mosh4j.core.MoshClientSession;
 import org.mosh4j.core.MoshTerminalFrontend;
 import org.mosh4j.crypto.MoshKey;
@@ -1161,39 +1173,39 @@ public class SessionManager {
             .filter(MoshTerminalFrontend::isRunning).count();
     }
 }
-```
+----
 
----
 
-## 17) Debug and Diagnostics
+== 17) Debug and Diagnostics
 
-### Enable debug logging
+=== Enable debug logging
 
 Set `KORTTY_MOSH_DEBUG=true` for verbose datagram-level logging:
 
-```bash
+[source,bash]
+----
 export KORTTY_MOSH_DEBUG=true
 java -jar your-app.jar
-```
-
-### Java Util Logging configuration
+----
+=== Java Util Logging configuration
 
 mosh4j uses `java.util.logging`. To see FINE-level logs:
 
-```properties
-# logging.properties
+[source,properties]
+----
+= logging.properties
 org.mosh4j.level = FINE
 handlers = java.util.logging.ConsoleHandler
 java.util.logging.ConsoleHandler.level = FINE
-```
-
-```bash
+----
+[source,bash]
+----
 java -Djava.util.logging.config.file=logging.properties -jar your-app.jar
-```
+----
+=== Framebuffer inspection
 
-### Framebuffer inspection
-
-```java
+[source,java]
+----
 Framebuffer fb = session.getFramebuffer();
 System.out.println("Size: " + fb.getWidth() + "x" + fb.getHeight());
 System.out.println("Cursor: row=" + fb.getCursorRow()
@@ -1213,77 +1225,91 @@ for (int row = 0; row < fb.getHeight(); row++) {
     }
     System.out.println("Row " + row + ": [" + line + "]");
 }
-```
+----
 
----
 
-## 18) API Reference Summary
+== 18) API Reference Summary
 
-### MoshClientSession
+=== MoshClientSession
 
-| Method | Description |
-|--------|-------------|
-| `MoshClientSession(addr, key, w, h)` | Create session |
-| `sendInitialWakeUp()` | Trigger first server frame |
-| `sendUserInput(byte[])` | Send keystrokes |
-| `sendResize(int, int)` | Notify resize |
-| `receiveOnce()` | Receive one datagram (poll-friendly) |
-| `getFramebuffer()` | Access framebuffer |
-| `pollHostBytes()` | Non-blocking raw bytes |
-| `takeHostBytes(long)` | Blocking raw bytes |
-| `sendHeartbeat()` | Send keepalive |
-| `close()` | Close session |
-| `isRunning()` | Check active |
+[cols="1,1"]
+|===
+|Method|Description
+|`MoshClientSession(addr, key, w, h)`|Create session
+|`sendInitialWakeUp()`|Trigger first server frame
+|`sendUserInput(byte[])`|Send keystrokes
+|`sendResize(int, int)`|Notify resize
+|`receiveOnce()`|Receive one datagram (poll-friendly)
+|`getFramebuffer()`|Access framebuffer
+|`pollHostBytes()`|Non-blocking raw bytes
+|`takeHostBytes(long)`|Blocking raw bytes
+|`sendHeartbeat()`|Send keepalive
+|`close()`|Close session
+|`isRunning()`|Check active
+|===
 
-### MoshTerminalFrontend
 
-| Method | Description |
-|--------|-------------|
-| `MoshTerminalFrontend(session)` | Default frontend |
-| `MoshTerminalFrontend(session, renderer, cap)` | Custom renderer + queue |
-| `start()` | Start receive thread |
-| `pollOnce()` | Single-threaded receive |
-| `sendInitialWakeUp()` | Wake up server |
-| `sendUserInput(byte[])` | Forward keystrokes |
-| `sendResize(int, int)` | Forward resize |
-| `sendHeartbeat()` | Send keepalive |
-| `pollRenderedOutput()` | Non-blocking ANSI frame |
-| `takeRenderedOutput(long)` | Blocking ANSI frame |
-| `pollHostBytes()` | Non-blocking raw bytes |
-| `takeHostBytes(long)` | Blocking raw bytes |
-| `pendingFrames()` | Queued frame count |
-| `isRunning()` | Check active |
-| `close()` | Stop + close |
+=== MoshTerminalFrontend
 
-### MoshServerSession
+[cols="1,1"]
+|===
+|Method|Description
+|`MoshTerminalFrontend(session)`|Default frontend
+|`MoshTerminalFrontend(session, renderer, cap)`|Custom renderer + queue
+|`start()`|Start receive thread
+|`pollOnce()`|Single-threaded receive
+|`sendInitialWakeUp()`|Wake up server
+|`sendUserInput(byte[])`|Forward keystrokes
+|`sendResize(int, int)`|Forward resize
+|`sendHeartbeat()`|Send keepalive
+|`pollRenderedOutput()`|Non-blocking ANSI frame
+|`takeRenderedOutput(long)`|Blocking ANSI frame
+|`pollHostBytes()`|Non-blocking raw bytes
+|`takeHostBytes(long)`|Blocking raw bytes
+|`pendingFrames()`|Queued frame count
+|`isRunning()`|Check active
+|`close()`|Stop + close
+|===
 
-| Method | Description |
-|--------|-------------|
-| `MoshServerSession(port, key, w, h)` | Bind UDP port |
-| `feedHostOutput(byte[])` | Push bytes to client |
-| `receiveOnce()` | Process client datagram |
-| `getFramebuffer()` | Server framebuffer |
-| `close()` | Stop server |
-| `isRunning()` | Check active |
 
-### MoshKey
+=== MoshServerSession
 
-| Method | Description |
-|--------|-------------|
-| `MoshKey.fromBase64(String)` | Decode 22-char Base64 key |
-| `MoshKey.fromBytes(byte[])` | From raw 16 bytes |
-| `getKeyBytes()` | Raw key bytes |
+[cols="1,1"]
+|===
+|Method|Description
+|`MoshServerSession(port, key, w, h)`|Bind UDP port
+|`feedHostOutput(byte[])`|Push bytes to client
+|`receiveOnce()`|Process client datagram
+|`getFramebuffer()`|Server framebuffer
+|`close()`|Stop server
+|`isRunning()`|Check active
+|===
 
-### StatefulAnsiRenderer
 
-| Method | Description |
-|--------|-------------|
-| `render(Framebuffer)` | Produce ANSI string |
-| `reset()` | Force full redraw on next render |
+=== MoshKey
 
----
+[cols="1,1"]
+|===
+|Method|Description
+|`MoshKey.fromBase64(String)`|Decode 22-char Base64 key
+|`MoshKey.fromBytes(byte[])`|From raw 16 bytes
+|`getKeyBytes()`|Raw key bytes
+|===
 
-## 19) Practical Checklist
+
+=== StatefulAnsiRenderer
+
+[cols="1,1"]
+|===
+|Method|Description
+|`render(Framebuffer)`|Produce ANSI string
+|`reset()`|Force full redraw on next render
+|===
+
+
+
+
+== 19) Practical Checklist
 
 - [ ] Decode and validate key with `MoshKey.fromBase64()`
 - [ ] Create `MoshClientSession` with correct host, port, width, height
