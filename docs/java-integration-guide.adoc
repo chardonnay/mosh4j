@@ -688,31 +688,8 @@ public class ResilientMoshClient {
 
 == 11) Threading Model
 
-[source]
-----
-+-----------------------------------------------+
-|              Your Application                  |
-|  +--------------+    +--------------------+    |
-|  |  UI Thread   |    |   Input Thread     |    |
-|  | takeRendered |    | sendUserInput()    |    |
-|  | Output()     |    | sendResize()       |    |
-|  +------+-------+    +--------+-----------+    |
-|         |                     |                |
-|         v                     v                |
-|  +---------------------------------------------+
-[cols="1,1"]
-|===
-||MoshTerminalFrontend
-|||Background Receive Thread (daemon)|
-|===
+image::images/mosh4j-threading-model.png[mosh4j Threading Model]
 
-[cols="1"]
-|===
-|+---------------------------------------------+
-|===
-
-+-----------------------------------------------+
-----
 *Thread-safety rules:*
 - `sendUserInput()`, `sendResize()`, `sendHeartbeat()` — safe from any thread
 - `takeRenderedOutput()` / `takeHostBytes()` — safe from any single consumer thread
