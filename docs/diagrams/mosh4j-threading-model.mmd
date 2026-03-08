@@ -1,0 +1,74 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#2d3436",
+    "primaryTextColor": "#dfe6e9",
+    "primaryBorderColor": "#636e72",
+    "lineColor": "#74b9ff",
+    "fontFamily": "Menlo, Consolas, monospace",
+    "fontSize": "13px"
+  },
+  "flowchart": {
+    "nodeSpacing": 22,
+    "rankSpacing": 45,
+    "curve": "basis",
+    "padding": 14
+  }
+}}%%
+
+graph TD
+    classDef appNode    fill:#00b894,stroke:#55efc4,color:#2d3436,stroke-width:2px
+    classDef uiNode     fill:#00cec9,stroke:#81ecec,color:#2d3436,stroke-width:2px
+    classDef inputNode  fill:#0984e3,stroke:#74b9ff,color:#dfe6e9,stroke-width:2px
+    classDef feNode     fill:#6c5ce7,stroke:#a29bfe,color:#dfe6e9,stroke-width:2px
+    classDef bgNode     fill:#d63031,stroke:#ff7675,color:#dfe6e9,stroke-width:2px
+    classDef queueNode  fill:#e17055,stroke:#fab1a0,color:#2d3436,stroke-width:2px
+    classDef sessNode   fill:#636e72,stroke:#b2bec3,color:#dfe6e9,stroke-width:2px
+    classDef netNode    fill:#2d3436,stroke:#636e72,color:#b2bec3,stroke-width:1px,stroke-dasharray:5 5
+    classDef noteNode   fill:#2d3436,stroke:#fdcb6e,color:#fdcb6e,stroke-width:1px,stroke-dasharray:3 3
+
+    subgraph APP["Your Application"]
+        direction LR
+        UI["<b>UI Thread</b><br/>takeRenderedOutput(timeout)<br/>takeHostBytes(timeout)"]:::uiNode
+        IN["<b>Input Thread</b><br/>sendUserInput(bytes)<br/>sendResize(cols, rows)<br/>sendHeartbeat()"]:::inputNode
+    end
+
+    subgraph FRONTEND["MoshTerminalFrontend"]
+        direction TB
+        RQ["<b>Rendered Output Queue</b><br/>LinkedBlockingQueue&lt;String&gt;<br/>capacity: 256 (default)"]:::queueNode
+        HQ["<b>Host Bytes Queue</b><br/>LinkedBlockingQueue&lt;byte[]&gt;<br/>capacity: 2048"]:::queueNode
+
+        subgraph BGT["Background Receive Thread  (daemon)"]
+            direction TB
+            BG1["receiveOnce()"]:::bgNode
+            BG2["decrypt → defragment<br/>→ protobuf parse"]:::bgNode
+            BG3["framebuffer.feedHostBytes()"]:::bgNode
+            BG4["StatefulAnsiRenderer.render()"]:::bgNode
+            BG5["enqueue frame / bytes"]:::bgNode
+            BG1 --> BG2 --> BG3 --> BG4 --> BG5
+            BG5 -.->|loop| BG1
+        end
+    end
+
+    subgraph SESSION["MoshClientSession"]
+        CS["<b>DatagramSocket</b><br/>receive timeout: 250 ms<br/>AES-128-OCB codec<br/>FragmentCodec"]:::sessNode
+    end
+
+    NET["<b>mosh-server</b><br/>UDP · AES-128-OCB"]:::netNode
+
+    UI      -->|poll| RQ
+    UI      -->|poll| HQ
+    IN      -->|thread-safe| CS
+    BGT     -->|produces| RQ
+    BGT     -->|produces| HQ
+    BG1     <-->|send/recv| CS
+    CS      <-->|UDP| NET
+
+    NOTE1["Thread-safety rules:<br/>• send*() — safe from any thread<br/>• take*() — single consumer thread<br/>• close() — safe from any thread<br/>• daemon thread: no JVM shutdown block"]:::noteNode
+
+    FRONTEND ~~~ NOTE1
+
+    style APP      fill:none,stroke:#55efc4,stroke-width:2px
+    style FRONTEND fill:none,stroke:#a29bfe,stroke-width:2px
+    style BGT      fill:none,stroke:#ff7675,stroke-width:1px,stroke-dasharray:4 4
+    style SESSION  fill:none,stroke:#636e72,stroke-width:1px

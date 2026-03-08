@@ -1,0 +1,48 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#2d3436",
+    "primaryTextColor": "#dfe6e9",
+    "primaryBorderColor": "#636e72",
+    "lineColor": "#74b9ff",
+    "fontFamily": "Menlo, Consolas, monospace",
+    "fontSize": "13px"
+  },
+  "flowchart": {
+    "nodeSpacing": 25,
+    "rankSpacing": 45,
+    "curve": "basis",
+    "padding": 14
+  }
+}}%%
+
+graph TD
+    classDef appNode    fill:#00b894,stroke:#55efc4,color:#2d3436,stroke-width:2px
+    classDef coreNode   fill:#0984e3,stroke:#74b9ff,color:#dfe6e9,stroke-width:2px
+    classDef midNode    fill:#e17055,stroke:#fab1a0,color:#2d3436,stroke-width:2px
+    classDef protoNode  fill:#6c5ce7,stroke:#a29bfe,color:#dfe6e9,stroke-width:2px
+
+    APP["<b>Your Application</b><br/>(e.g. korTTY)"]:::appNode
+
+    subgraph CORE["mosh4j-core"]
+        direction LR
+        CS["<b>MoshClientSession</b><br/>UDP send/receive, framebuffer"]:::coreNode
+        SS["<b>MoshServerSession</b><br/>UDP bind, PTY feed"]:::coreNode
+        FE["<b>MoshTerminalFrontend</b><br/>background thread, ANSI queue"]:::coreNode
+    end
+
+    subgraph MID[" "]
+        direction LR
+        TR["<b>mosh4j-transport</b><br/>TransportSender<br/>TransportReceiver<br/>FragmentCodec"]:::midNode
+        TE["<b>mosh4j-terminal</b><br/>Framebuffer<br/>MinimalAnsiParser<br/>StatefulAnsiRenderer"]:::midNode
+        CR["<b>mosh4j-crypto</b><br/>SspCipher · AES-128-OCB<br/>Nonce · MoshKey"]:::midNode
+    end
+
+    PROTO["<b>mosh4j-protocol</b><br/>Protobuf DTOs — TransportBuffers · ClientBuffers · HostBuffers"]:::protoNode
+
+    APP --> CORE
+    CORE --> MID
+    MID --> PROTO
+
+    style CORE fill:none,stroke:#74b9ff,stroke-width:2px
+    style MID  fill:none,stroke:none

@@ -1,0 +1,71 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#2d3436",
+    "primaryTextColor": "#dfe6e9",
+    "primaryBorderColor": "#636e72",
+    "lineColor": "#74b9ff",
+    "signalColor": "#b2bec3",
+    "labelBoxBkgColor": "#2d3436",
+    "labelBoxBorderColor": "#636e72",
+    "labelTextColor": "#dfe6e9",
+    "loopTextColor": "#dfe6e9",
+    "activationBorderColor": "#0984e3",
+    "activationBkgColor": "#0984e3",
+    "sequenceNumberColor": "#dfe6e9",
+    "actorBkg": "#2d3436",
+    "actorBorder": "#636e72",
+    "actorTextColor": "#dfe6e9",
+    "actorLineColor": "#636e72",
+    "noteBkgColor": "#2d3436",
+    "noteBorderColor": "#6c5ce7",
+    "noteTextColor": "#dfe6e9",
+    "fontFamily": "Menlo, Consolas, monospace",
+    "fontSize": "13px"
+  }
+}}%%
+
+sequenceDiagram
+    actor App as Your App<br/>(korTTY)
+    participant FE as MoshTerminal<br/>Frontend
+    participant CS as MoshClient<br/>Session
+    participant UDP as UDP Network
+    participant SRV as mosh-server<br/>(C++)
+
+    Note over App,SRV: Phase 1 — Bootstrap & Session Setup
+    App->>CS: new MoshClientSession(addr, key, 80, 24)
+    App->>FE: new MoshTerminalFrontend(session)
+
+    Note over App,SRV: Phase 2 — Initial Wake-Up
+    App->>FE: sendInitialWakeUp()
+    FE->>CS: sendUserInput([0x00])
+    CS->>UDP: AES-128-OCB encrypted datagram
+    UDP->>SRV: encrypted datagram
+
+    Note over App,SRV: Phase 3 — Start Background Thread
+    App->>FE: start()
+    activate FE
+    Note right of FE: Background receive<br/>thread (daemon) starts
+
+    Note over App,SRV: Phase 4 — Active Session Loop
+    SRV-->>UDP: host output (terminal data)
+    UDP-->>CS: encrypted datagram
+    CS->>CS: decrypt → defragment<br/>→ protobuf parse → framebuffer
+    CS-->>FE: framebuffer updated
+    FE-->>App: takeRenderedOutput() → ANSI frame
+    App->>FE: sendUserInput(keystrokes)
+    FE->>CS: sendUserInput(bytes)
+    CS->>UDP: AES-128-OCB encrypted datagram
+    UDP->>SRV: encrypted datagram
+
+    Note over App,SRV: Phase 5 — Resize
+    App->>FE: sendResize(cols, rows)
+    FE->>CS: sendResize(cols, rows)
+    CS->>UDP: resize datagram
+    UDP->>SRV: resize notification
+
+    Note over App,SRV: Phase 6 — Shutdown
+    App->>FE: close()
+    deactivate FE
+    FE->>CS: close()
+    Note right of CS: UDP socket closed

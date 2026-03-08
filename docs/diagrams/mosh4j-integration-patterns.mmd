@@ -1,0 +1,59 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#2d3436",
+    "primaryTextColor": "#dfe6e9",
+    "primaryBorderColor": "#636e72",
+    "lineColor": "#b2bec3",
+    "fontFamily": "Menlo, Consolas, monospace",
+    "fontSize": "13px"
+  },
+  "flowchart": {
+    "nodeSpacing": 22,
+    "rankSpacing": 42,
+    "curve": "basis",
+    "padding": 12
+  }
+}}%%
+
+graph TD
+    classDef appNode    fill:#00b894,stroke:#55efc4,color:#2d3436,stroke-width:2px
+    classDef frontNode  fill:#0984e3,stroke:#74b9ff,color:#dfe6e9,stroke-width:2px
+    classDef sessNode   fill:#6c5ce7,stroke:#a29bfe,color:#dfe6e9,stroke-width:2px
+    classDef outNodeA   fill:#00cec9,stroke:#81ecec,color:#2d3436,stroke-width:2px
+    classDef outNodeB   fill:#e17055,stroke:#fab1a0,color:#2d3436,stroke-width:2px
+    classDef outNodeC   fill:#fdcb6e,stroke:#ffeaa7,color:#2d3436,stroke-width:2px
+    classDef serverNode fill:#636e72,stroke:#b2bec3,color:#dfe6e9,stroke-width:1px,stroke-dasharray:5 5
+
+    APP["<b>Your Application</b><br/>korTTY / Terminal UI"]:::appNode
+
+    subgraph PA["Pattern A — ANSI Frames"]
+        FEA["<b>MoshTerminalFrontend</b><br/>start() · background thread"]:::frontNode
+        OA["<b>takeRenderedOutput()</b><br/>→ ANSI escape sequence string<br/>→ terminal widget / stdout"]:::outNodeA
+        FEA --> OA
+    end
+
+    subgraph PB["Pattern B — Raw Host Bytes"]
+        FEB["<b>MoshTerminalFrontend</b><br/>start() · background thread"]:::frontNode
+        OB["<b>takeHostBytes()</b><br/>→ raw VT100 / UTF-8 bytes<br/>→ custom terminal emulator"]:::outNodeB
+        FEB --> OB
+    end
+
+    subgraph PC["Pattern C — Low-Level"]
+        SE["<b>MoshClientSession</b><br/>receiveOnce() · poll loop"]:::sessNode
+        OC["<b>getFramebuffer()</b><br/>→ cell grid + cursor state<br/>→ own rendering pipeline"]:::outNodeC
+        SE --> OC
+    end
+
+    SRV["<b>mosh-server</b><br/>(C++ · UDP · AES-128-OCB)"]:::serverNode
+
+    APP -->|sendUserInput| FEA
+    APP -->|sendUserInput| FEB
+    APP -->|sendUserInput| SE
+    FEA <-->|UDP| SRV
+    FEB <-->|UDP| SRV
+    SE  <-->|UDP| SRV
+
+    style PA fill:none,stroke:#81ecec,stroke-width:1px,stroke-dasharray:4 4
+    style PB fill:none,stroke:#fab1a0,stroke-width:1px,stroke-dasharray:4 4
+    style PC fill:none,stroke:#ffeaa7,stroke-width:1px,stroke-dasharray:4 4
