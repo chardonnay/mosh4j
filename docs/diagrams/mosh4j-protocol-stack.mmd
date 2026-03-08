@@ -9,14 +9,14 @@
     "fontSize": "13px"
   },
   "flowchart": {
-    "nodeSpacing": 18,
-    "rankSpacing": 38,
+    "nodeSpacing": 16,
+    "rankSpacing": 32,
     "curve": "linear",
-    "padding": 12
+    "padding": 10
   }
 }}%%
 
-graph LR
+graph TD
     classDef appLayer   fill:#00b894,stroke:#55efc4,color:#2d3436,stroke-width:2px
     classDef protoLayer fill:#0984e3,stroke:#74b9ff,color:#dfe6e9,stroke-width:2px
     classDef fragLayer  fill:#e17055,stroke:#fab1a0,color:#2d3436,stroke-width:2px
@@ -24,31 +24,23 @@ graph LR
     classDef cryptLayer fill:#6c5ce7,stroke:#a29bfe,color:#dfe6e9,stroke-width:2px
     classDef netLayer   fill:#636e72,stroke:#b2bec3,color:#dfe6e9,stroke-width:2px
 
-    subgraph SEND["Sending  (Client → Server)"]
-        direction TB
-        S1["<b>User Keystrokes</b><br/>byte[]"]:::appLayer
-        S2["<b>Protobuf Encode</b><br/>ClientBuffers.UserMessage<br/>→ TransportBuffers.Instruction"]:::protoLayer
-        S3["<b>Fragment Layer</b><br/>zlib compress → split<br/>fragment header + payload"]:::fragLayer
-        S4["<b>SSP Datagram</b><br/>12-byte nonce · timestamp<br/>timestamp_reply"]:::sspLayer
-        S5["<b>AES-128-OCB Encrypt</b><br/>SspCipher.encrypt()"]:::cryptLayer
-        S6["<b>UDP Send</b><br/>DatagramSocket"]:::netLayer
-        S1 --> S2 --> S3 --> S4 --> S5 --> S6
-    end
+    S1["<b>User Keystrokes</b><br/>byte[]"]:::appLayer
+    S2["<b>Protobuf Encode</b><br/>ClientBuffers.UserMessage<br/>→ TransportBuffers.Instruction"]:::protoLayer
+    S3["<b>Fragment + zlib Compress</b><br/>fragment header + payload"]:::fragLayer
+    S4["<b>SSP Datagram</b><br/>12-byte nonce · timestamps"]:::sspLayer
+    S5["<b>AES-128-OCB Encrypt</b><br/>SspCipher.encrypt()"]:::cryptLayer
 
-    NET(["<b>Network</b><br/>UDP / IP"]):::netLayer
+    NET(["<b>Network  ·  UDP / IP</b>"]):::netLayer
 
-    subgraph RECV["Receiving  (Server → Client)"]
-        direction TB
-        R6["<b>UDP Receive</b><br/>DatagramSocket"]:::netLayer
-        R5["<b>AES-128-OCB Decrypt</b><br/>verify + decrypt"]:::cryptLayer
-        R4["<b>SSP Datagram Parse</b><br/>extract nonce, timestamps<br/>fragment payload"]:::sspLayer
-        R3["<b>Fragment Reassembly</b><br/>defragment + zlib decompress"]:::fragLayer
-        R2["<b>Protobuf Decode</b><br/>HostBuffers.HostMessage<br/>→ host bytes + resize"]:::protoLayer
-        R1["<b>Terminal Update</b><br/>Framebuffer · ANSI render<br/>→ display"]:::appLayer
-        R6 --> R5 --> R4 --> R3 --> R2 --> R1
-    end
+    R5["<b>AES-128-OCB Decrypt</b><br/>verify + decrypt"]:::cryptLayer
+    R4["<b>SSP Datagram Parse</b><br/>nonce · timestamps · payload"]:::sspLayer
+    R3["<b>Fragment Reassembly</b><br/>defragment + zlib decompress"]:::fragLayer
+    R2["<b>Protobuf Decode</b><br/>HostBuffers.HostMessage<br/>→ host bytes + resize"]:::protoLayer
+    R1["<b>Terminal Update</b><br/>Framebuffer · ANSI render"]:::appLayer
 
-    S6 --> NET --> R6
-
-    style SEND fill:none,stroke:#55efc4,stroke-width:1px,stroke-dasharray:4 4
-    style RECV fill:none,stroke:#74b9ff,stroke-width:1px,stroke-dasharray:4 4
+    S1 -->|"Sending  ↓"| S2
+    S2 --> S3 --> S4 --> S5
+    S5 -->|"UDP Send"| NET
+    NET -->|"UDP Receive"| R5
+    R5 --> R4 --> R3 --> R2
+    R2 -->|"Receiving  ↓"| R1
