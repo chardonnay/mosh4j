@@ -33,5 +33,4 @@ Thumbs.db
 # Generated
 *.proto.orig
 
-# Mermaid-generated diagram images (build with: ./docs/generate-diagrams.sh)
-docs/images/*.png
+# Mermaid diagram sources in docs/diagrams/; generated PNGs committed to docs/images/
