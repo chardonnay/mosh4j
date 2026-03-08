@@ -45,28 +45,10 @@ image::images/mosh4j-architecture.png[mosh4j Architecture]
 
 == 2) Architecture
 
-The library is split into five modules:
+The library is split into five modules.
 
 [source]
-----
-+-----------------------------------------------------+
-|               Your Application (korTTY)              |
-+-----------------------------------------------------+
-|                    mosh4j-core                       |
-|  MoshClientSession / MoshServerSession               |
-|  MoshTerminalFrontend                                |
-+-----------------+-----------------+------------------+
-| mosh4j-         | mosh4j-         | mosh4j-crypto    |
-| transport       | terminal        | SspCipher        |
-| SSP state       | Framebuffer     | AES-128-OCB      |
-| sync, frags     | ANSI parse/     | Nonce, MoshKey   |
-|                 | render          |                  |
-+-----------------+-----------------+------------------+
-|                  mosh4j-protocol                     |
-|     Protobuf: TransportBuffers, ClientBuffers,       |
-|               HostBuffers                            |
-+-----------------------------------------------------+
-----
+
 *What each module does:*
 
 [cols="1,1"]
