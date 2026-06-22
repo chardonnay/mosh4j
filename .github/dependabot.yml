@@ -1,0 +1,19 @@
+# Dependabot keeps Maven dependencies and GitHub Actions up to date so known
+# vulnerabilities (e.g. the Bouncy Castle CVEs) surface as PRs automatically.
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      maven-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10

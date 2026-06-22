@@ -1,0 +1,38 @@
+# Software Composition Analysis (SCA) gate: fails the build when a declared
+# dependency matches a known vulnerability in the OSV database. Catches issues
+# like the Bouncy Castle CVEs (security_best_practices_report.md H-1) early.
+
+name: Security Scan (OSV)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 04:30 UTC — picks up newly disclosed CVEs in unchanged deps.
+    - cron: "30 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  osv-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install OSV-Scanner
+        run: |
+          set -euo pipefail
+          VERSION=v2.4.0
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/${VERSION}/osv-scanner_linux_amd64" -o osv-scanner
+          chmod +x osv-scanner
+          ./osv-scanner --version
+
+      - name: Scan dependencies
+        # Recursively scans every pom.xml in the multi-module build and exits
+        # non-zero if any known vulnerability is found.
+        run: ./osv-scanner scan source --recursive .

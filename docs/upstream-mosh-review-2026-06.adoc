@@ -1,0 +1,89 @@
+= Upstream MOSH Protocol Review (June 2026)
+:toc: macro
+:source-highlighter: highlight.js
+
+Review date: 2026-06-22
+
+This note records a review of the upstream
+https://github.com/mobile-shell/mosh[mosh] project to determine whether any
+*protocol-level* changes need to be ported into Mosh4J.
+
+toc::[]
+
+== Verdict
+
+*No wire-protocol migration is required.* Mosh4J already implements the current
+MOSH State Synchronization Protocol (SSP) wire format and remains compatible with
+upstream.
+
+== Evidence
+
+[cols="1,3",options="header"]
+|===
+| Item | Finding
+
+| Protocol version (upstream)
+| `MOSH_PROTOCOL_VERSION = 2` in `src/network/network.h` on `master`
+(comment: _"bumped for echo-ack"_). Unchanged.
+
+| Protocol version (Mosh4J)
+| `MOSH_PROTOCOL_VERSION = 2`, set and validated in
+`mosh4j-transport/.../TransportInstruction.java`.
+
+| Latest upstream release
+| `mosh-1.4.0` (October 2022). No newer release tag exists as of this review.
+
+| Wire format (`.proto`)
+| `transportinstruction.proto`, `userinput.proto`, and `hostinput.proto` in
+`mosh4j-protocol/src/main/proto` match the upstream definitions field-for-field
+(`protocol_version`, `old_num`, `new_num`, `ack_num`, `throwaway_num`, `diff`,
+`chaff`; keystroke/resize/hostbytes/echoack extensions).
+
+| Crypto
+| AES-128-OCB, 12-byte nonce (4 zero bytes + 8 wire bytes encoding
+direction + 63-bit sequence). Unchanged upstream.
+
+| Fragment layer
+| 10-byte header (`uint64` instruction id + `uint16` fragment-num/final-flag) +
+zlib-compressed chunk. Unchanged upstream.
+|===
+
+== Recent upstream `master` commits — why none are ported
+
+The commits on upstream `master` since 1.4.0 do not touch the wire format and/or
+do not apply to a Java implementation:
+
+[cols="2,3",options="header"]
+|===
+| Upstream change | Disposition in Mosh4J
+
+| OSC 8 hyperlink terminal escape support
+| *Out of scope.* Terminal-layer feature, not the wire protocol. Mosh4J's terminal
+is intentionally minimal (`MinimalAnsiParser` treats SGR as a no-op and does not
+render colours/renditions), so OSC 8 hyperlinks are not a protocol requirement.
+Can be revisited if richer terminal emulation is pursued.
+
+| `prng: support getrandom & getentropy`
+| *Not applicable.* C-runtime entropy sourcing. Mosh4J uses `java.security.SecureRandom`
+for keys, nonces, and chaff, which already provides a CSPRNG.
+
+| `select: use SA_RESTART with signals`
+| *Not applicable.* POSIX signal/`select(2)` handling specific to the C client/server.
+
+| `client: drop NACL check`
+| *Not applicable.* Build/dependency cleanup for the C codebase (NaCl); Mosh4J does
+not depend on NaCl.
+|===
+
+== Security advisories
+
+No MOSH security advisories or CVEs were found for the 2023–2026 period. The
+historical mosh CVEs (CVE-2012-2384, CVE-2012-2385) predate 1.2.3 and do not
+apply to the current protocol. Security hardening for Mosh4J is tracked separately
+in `security_best_practices_report.md`.
+
+== Conclusion
+
+Mosh4J targeting `MOSH_PROTOCOL_VERSION = 2` is current and wire-compatible with
+upstream mosh 1.4.0 and `master`. This review produced no protocol code changes.
+The accompanying branch focuses on the security hardening findings instead.

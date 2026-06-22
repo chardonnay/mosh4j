@@ -37,4 +37,27 @@ class TransportInstructionTest {
         assertEquals(3, ack.getThrowawayNum());
         assertFalse(ack.hasDiff());
     }
+
+    @Test
+    void protocolVersionValidation() {
+        // create() always stamps the current protocol version.
+        Transportinstruction.Instruction valid = TransportInstruction.create(0, 1, 0, 0, "x".getBytes());
+        assertTrue(TransportInstruction.isProtocolVersionValid(valid));
+
+        // Missing protocol_version (default 0) must be rejected.
+        Transportinstruction.Instruction missing = Transportinstruction.Instruction.newBuilder()
+                .setOldNum(0).setNewNum(1).build();
+        assertFalse(TransportInstruction.isProtocolVersionValid(missing));
+
+        // Wrong protocol_version must be rejected.
+        Transportinstruction.Instruction wrong = Transportinstruction.Instruction.newBuilder()
+                .setProtocolVersion(1).setOldNum(0).setNewNum(1).build();
+        assertFalse(TransportInstruction.isProtocolVersionValid(wrong));
+    }
+
+    @Test
+    void parseRejectsOversizedInput() {
+        byte[] tooBig = new byte[16 * 1024 * 1024 + 1];
+        assertThrows(java.io.IOException.class, () -> TransportInstruction.parse(tooBig));
+    }
 }

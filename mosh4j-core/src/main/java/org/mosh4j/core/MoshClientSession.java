@@ -46,6 +46,7 @@ public class MoshClientSession {
     private final Framebuffer framebuffer;
     private final TransportReceiver outputReceiver;
     private final FragmentCodec fragmentDecoder;
+    private final ReplayWindow replayWindow = new ReplayWindow();
     private final AtomicLong sendSeq = new AtomicLong(0);
     private final AtomicLong clientStateSeq = new AtomicLong(1);
     private final AtomicLong instructionId = new AtomicLong(0);
@@ -213,6 +214,12 @@ public class MoshClientSession {
         try {
             DatagramPayload payload = codec.decode(result.packet());
             if (payload.isServerToClient()) {
+                if (!replayWindow.accept(payload.getSeq())) {
+                    if (DEBUG) {
+                        LOG.log(Level.FINE, "Dropping replayed/stale server datagram seq={0}", payload.getSeq());
+                    }
+                    return true;
+                }
                 lastTimestampReceived = payload.getTimestamp();
                 byte[] fragmentData = payload.getPayload();
                 if (fragmentData != null && fragmentData.length > 0) {
