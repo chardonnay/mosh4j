@@ -84,14 +84,14 @@ Add `mosh4j-core` to your Maven `pom.xml`:
 <dependency>
   <groupId>org.mosh4j</groupId>
   <artifactId>mosh4j-core</artifactId>
-  <version>2.0.1</version>
+  <version>2.0.2</version>
 </dependency>
 ----
 For Gradle:
 
 [source,groovy]
 ----
-implementation 'org.mosh4j:mosh4j-core:2.0.1'
+implementation 'org.mosh4j:mosh4j-core:2.0.2'
 ----
 `mosh4j-core` transitively includes `mosh4j-protocol`, `mosh4j-crypto`, `mosh4j-transport`, and `mosh4j-terminal`. You do not need to declare them separately.
 
@@ -102,7 +102,7 @@ If you only need the crypto layer (e.g. for a custom protocol implementation):
 <dependency>
   <groupId>org.mosh4j</groupId>
   <artifactId>mosh4j-crypto</artifactId>
-  <version>2.0.1</version>
+  <version>2.0.2</version>
 </dependency>
 ----
 
