@@ -33,6 +33,10 @@ jobs:
           ./osv-scanner --version
 
       - name: Scan dependencies
-        # Recursively scans every pom.xml in the multi-module build and exits
-        # non-zero if any known vulnerability is found.
-        run: ./osv-scanner scan source --recursive .
+        # Scans every declared dependency across the multi-module build and exits
+        # non-zero when a known vulnerability is found. --no-resolve disables transitive
+        # resolution, which would otherwise fail (exit 127) trying to resolve the
+        # unpublished internal org.mosh4j:* reactor modules against Maven Central.
+        # Transitive-dependency vulnerabilities are covered by Dependabot
+        # (.github/dependabot.yml).
+        run: ./osv-scanner scan source --recursive --no-resolve .
