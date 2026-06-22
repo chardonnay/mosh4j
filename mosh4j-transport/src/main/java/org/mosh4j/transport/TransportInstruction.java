@@ -2,6 +2,8 @@ package org.mosh4j.transport;
 
 import TransportBuffers.Transportinstruction;
 
+import com.google.protobuf.CodedInputStream;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.SecureRandom;
@@ -16,6 +18,8 @@ public final class TransportInstruction {
     public static final int MOSH_PROTOCOL_VERSION = 2;
     private static final int MAX_FRAGMENT_SIZE = 1400;
     private static final int MAX_CHAFF_BYTES = 16;
+    /** Upper bound on a serialized transport instruction; mirrors the fragment-layer decompression cap. */
+    private static final int MAX_INSTRUCTION_BYTES = 16 * 1024 * 1024;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     public static int getMaxFragmentSize() {
@@ -23,11 +27,17 @@ public final class TransportInstruction {
     }
 
     public static Transportinstruction.Instruction parse(byte[] bytes) throws IOException {
+        Objects.requireNonNull(bytes, "bytes");
+        if (bytes.length > MAX_INSTRUCTION_BYTES) {
+            throw new IOException("Transport instruction exceeds limit of " + MAX_INSTRUCTION_BYTES + " bytes");
+        }
         return Transportinstruction.Instruction.parseFrom(bytes);
     }
 
     public static Transportinstruction.Instruction parseFrom(InputStream in) throws IOException {
-        return Transportinstruction.Instruction.parseFrom(in);
+        CodedInputStream cis = CodedInputStream.newInstance(in);
+        cis.setSizeLimit(MAX_INSTRUCTION_BYTES);
+        return Transportinstruction.Instruction.parseFrom(cis);
     }
 
     public static byte[] toBytes(Transportinstruction.Instruction instruction) {

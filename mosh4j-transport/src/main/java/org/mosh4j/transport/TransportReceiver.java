@@ -43,6 +43,13 @@ public class TransportReceiver {
             return latestStateNum;
         }
 
+        // Freshness guard: only apply a diff that actually advances our latest state.
+        // applyDiff may have observable side effects (e.g. feeding terminal output), so a
+        // retransmitted or out-of-order diff for an already-seen state must not re-run it.
+        if (newNum <= latestStateNum) {
+            return latestStateNum;
+        }
+
         byte[] diff = instruction.hasDiff() ? instruction.getDiff().toByteArray() : new byte[0];
         byte[] newState = applyDiff.apply(base, diff);
         if (newState == null) {
@@ -50,11 +57,9 @@ public class TransportReceiver {
         }
 
         states.put(newNum, newState);
-        if (newNum > latestStateNum) {
-            latestStateNum = newNum;
-            latestState = newState;
-            onNewState.accept(newState);
-        }
+        latestStateNum = newNum;
+        latestState = newState;
+        onNewState.accept(newState);
 
         for (long i = 0; i < throwawayNum; i++) {
             states.remove(i);

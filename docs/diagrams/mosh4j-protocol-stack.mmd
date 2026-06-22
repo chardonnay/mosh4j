@@ -23,6 +23,7 @@ graph TD
     classDef sspLayer   fill:#d63031,stroke:#ff7675,color:#dfe6e9,stroke-width:2px
     classDef cryptLayer fill:#6c5ce7,stroke:#a29bfe,color:#dfe6e9,stroke-width:2px
     classDef netLayer   fill:#636e72,stroke:#b2bec3,color:#dfe6e9,stroke-width:2px
+    classDef secLayer   fill:#fdcb6e,stroke:#ffeaa7,color:#2d3436,stroke-width:2px
 
     S1["<b>User Keystrokes</b><br/>byte[]"]:::appLayer
     S2["<b>Protobuf Encode</b><br/>ClientBuffers.UserMessage<br/>→ TransportBuffers.Instruction"]:::protoLayer
@@ -34,7 +35,8 @@ graph TD
 
     R5["<b>AES-128-OCB Decrypt</b><br/>verify + decrypt"]:::cryptLayer
     R4["<b>SSP Datagram Parse</b><br/>nonce · timestamps · payload"]:::sspLayer
-    R3["<b>Fragment Reassembly</b><br/>defragment + zlib decompress"]:::fragLayer
+    RX["<b>Replay / Freshness Check</b><br/>anti-replay window · drop duplicates"]:::secLayer
+    R3["<b>Fragment Reassembly</b><br/>defragment + zlib decompress (≤ 16 MiB)"]:::fragLayer
     R2["<b>Protobuf Decode</b><br/>HostBuffers.HostMessage<br/>→ host bytes + resize"]:::protoLayer
     R1["<b>Terminal Update</b><br/>Framebuffer · ANSI render"]:::appLayer
 
@@ -42,5 +44,5 @@ graph TD
     S2 --> S3 --> S4 --> S5
     S5 -->|"UDP Send"| NET
     NET -->|"UDP Receive"| R5
-    R5 --> R4 --> R3 --> R2
+    R5 --> R4 --> RX --> R3 --> R2
     R2 -->|"Receiving  ↓"| R1

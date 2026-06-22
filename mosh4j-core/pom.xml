@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.mosh4j</groupId>
     <artifactId>mosh4j</artifactId>
-    <version>2.0.1</version>
+    <version>2.0.2</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>mosh4j-core</artifactId>
@@ -43,6 +43,12 @@
     <dependency>
       <groupId>org.mosh4j</groupId>
       <artifactId>mosh4j-terminal</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.11.4</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

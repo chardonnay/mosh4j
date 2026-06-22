@@ -32,6 +32,14 @@ public final class FragmentCodec {
     private static final int MAX_FRAGMENT_COUNT = 0x8000;
     private static final int MAX_FRAGMENT_INDEX = 0x7FFF;
 
+    /**
+     * Upper bound on the size of a single reassembled/decompressed transport instruction.
+     * Bounds both the buffered compressed fragments and the zlib output so a small
+     * malicious payload cannot expand to exhaust the heap (decompression bomb). A mosh
+     * terminal state/diff is far smaller than this; 16 MiB leaves generous headroom.
+     */
+    public static final int MAX_DECOMPRESSED_BYTES = 16 * 1024 * 1024;
+
     private final ConcurrentHashMap<Long, FragmentAssembly> assemblies = new ConcurrentHashMap<>();
 
     /**
@@ -171,6 +179,9 @@ public final class FragmentCodec {
                         break;
                     }
                 }
+                if (baos.size() + n > MAX_DECOMPRESSED_BYTES) {
+                    throw new IOException("Decompressed size exceeds limit of " + MAX_DECOMPRESSED_BYTES + " bytes");
+                }
                 baos.write(tmp, 0, n);
             }
             return baos.toByteArray();
@@ -185,13 +196,22 @@ public final class FragmentCodec {
         final long id;
         final Map<Integer, byte[]> fragments = new HashMap<>();
         int totalFragments = -1;
+        long bufferedBytes = 0;
 
         FragmentAssembly(long id) {
             this.id = id;
         }
 
         void addFragment(int num, byte[] data, boolean isFinal) {
-            fragments.put(num, data);
+            byte[] prev = fragments.put(num, data);
+            if (prev != null) {
+                bufferedBytes -= prev.length;
+            }
+            bufferedBytes += data.length;
+            if (bufferedBytes > MAX_DECOMPRESSED_BYTES) {
+                throw new IllegalArgumentException(
+                        "Buffered fragment bytes exceed limit of " + MAX_DECOMPRESSED_BYTES);
+            }
             if (isFinal) {
                 totalFragments = num + 1;
             }

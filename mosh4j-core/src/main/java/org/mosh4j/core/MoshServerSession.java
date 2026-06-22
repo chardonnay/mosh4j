@@ -32,6 +32,7 @@ public class MoshServerSession {
     private final TransportSender outputSender;
     private final TransportReceiver inputReceiver;
     private final FragmentCodec fragmentDecoder;
+    private final ReplayWindow replayWindow = new ReplayWindow();
     private final AtomicReference<InetSocketAddress> clientAddress = new AtomicReference<>();
     private final AtomicLong sendSeq = new AtomicLong(0);
     private final AtomicLong instructionId = new AtomicLong(0);
@@ -85,6 +86,12 @@ public class MoshServerSession {
         try {
             DatagramPayload payload = codec.decode(result.packet());
             if (!payload.isServerToClient()) {
+                // Drop replays/stale datagrams before updating the roaming address,
+                // so a captured old packet cannot redirect the session.
+                if (!replayWindow.accept(payload.getSeq())) {
+                    LOG.log(Level.FINE, "Dropping replayed/stale client datagram");
+                    return true;
+                }
                 clientAddress.set(result.source());
                 int receivedTs = payload.getTimestamp();
                 lastTimestampReceived = receivedTs;
@@ -103,6 +110,10 @@ public class MoshServerSession {
                     byte[] protobufBytes = fragmentDecoder.decode(fragmentData);
                     if (protobufBytes != null) {
                         Transportinstruction.Instruction inst = TransportInstruction.parse(protobufBytes);
+                        if (!TransportInstruction.isProtocolVersionValid(inst)) {
+                            LOG.log(Level.FINE, "Ignoring instruction with invalid protocol_version");
+                            return true;
+                        }
                         inputReceiver.receive(inst);
                         if (inst.hasAckNum()) {
                             outputSender.setKnownReceiverState(inst.getAckNum());
