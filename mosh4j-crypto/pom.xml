@@ -18,13 +18,13 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <!-- 1.84 fixes CVE-2026-5598 (HIGH) and CVE-2026-0636 (MODERATE); see security_best_practices_report.md H-1 -->
-      <version>1.84</version>
+      <!-- 1.85 fixes CVE-2026-5598 (HIGH) and CVE-2026-0636 (MODERATE); see security_best_practices_report.md H-1 -->
+      <version>1.85</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>6.1.0</version>
+      <version>6.1.2</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
