@@ -15,7 +15,7 @@
   <description>Protobuf definitions and generated DTOs for Mosh SSP</description>
 
   <properties>
-    <protobuf.version>4.35.1</protobuf.version>
+    <protobuf.version>4.36.0</protobuf.version>
   </properties>
 
   <dependencies>
