@@ -1,0 +1,36 @@
+= mosh4j 2.0.3
+
+This is a *maintenance and security release*. It updates Bouncy Castle to fix new critical and high-severity CVEs, refreshes the Maven dependencies and build plugins, and updates the SHA-pinned GitHub Actions. There are no API or wire-protocol changes. Mosh4J is still wire-compatible with upstream mosh `1.4.0` (protocol v2).
+
+== Highlights
+
+* *Security*
+** Bouncy Castle `bcprov-jdk18on` goes from `1.84` to `1.86`. This fixes CVE-2026-8763 (CRITICAL, GHSA-9pwp-9qqc-pr26) and CVE-2026-13506 (HIGH, GHSA-qp49-qgx5-5m26), which are fixed in `>= 1.85`.
+* *Dependencies*
+** `protobuf-java` goes from `4.35.1` to `4.36.2`.
+** `junit-jupiter` goes from `6.1.0` to `6.1.3`.
+* *Build plugins*
+** `maven-compiler-plugin` goes from `3.15.0` to `3.16.0`.
+** `maven-surefire-plugin` goes from `3.5.6` to `3.6.0`.
+** `build-helper-maven-plugin` goes from `3.6.1` to `3.6.2`.
+** `exec-maven-plugin` goes from `3.6.3` to `3.6.4`.
+* *CI / GitHub Actions* (all still pinned to full commit SHAs)
+** `actions/checkout` goes from `7.0.0` to `7.0.1`.
+** `actions/setup-java` goes from `5.3.0` to `6.1.0`.
+** `actions/upload-artifact` goes from `7.0.1` to `7.0.2`.
+** `actions/download-artifact` goes from `8.0.1` to `8.0.2`.
+** `softprops/action-gh-release` goes from `3.0.1` to `3.0.3`.
+* *Housekeeping*
+** The outdated `security_best_practices_report.md` has been removed. The findings it covered are summarized in link:release-notes-2.0.2.adoc[Release Notes v2.0.2].
+
+== Upgrading
+
+Change the dependency version from `2.0.2` to `2.0.3`. No code changes are needed.
+
+== Requirements
+
+* *JDK 21* (LTS)
+
+== Artifacts
+
+When a GitHub Release is published for this tag, the release workflow publishes JARs for *x86_64 (amd64)* and *ARM64*.
