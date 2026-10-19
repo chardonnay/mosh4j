@@ -18,8 +18,9 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <!-- 1.84 fixes CVE-2026-5598 (HIGH) and CVE-2026-0636 (MODERATE); see security_best_practices_report.md H-1 -->
-      <version>1.84</version>
+      <!-- >= 1.84 fixes CVE-2026-5598 (HIGH) and CVE-2026-0636 (MODERATE); see security_best_practices_report.md H-1.
+           >= 1.85 fixes CVE-2026-8763 (CRITICAL, GHSA-9pwp-9qqc-pr26) and CVE-2026-13506 (HIGH, GHSA-qp49-qgx5-5m26). -->
+      <version>1.86</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
